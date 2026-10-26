@@ -590,7 +590,7 @@
 	/* PNGs on a white ground, inverted for dark mode: docs/css.md "base/95-luci.css: Statistics
 	 * graphs and Realtime SVGs are art drawn for a white ground" — 180deg is exact for the three
 	 * primaries, not tuned further. */
-	[data-darkmode="true"] [data-page="admin-statistics-graphs"] [data-plugin] img {
+	[data-darkmode="true"] :where(#view)[data-page="admin-statistics-graphs"] [data-plugin] img {
 		filter: invert(100%) hue-rotate(180deg);
 	}
 

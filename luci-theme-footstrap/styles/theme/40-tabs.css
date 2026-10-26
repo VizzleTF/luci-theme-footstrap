@@ -49,7 +49,7 @@
 	}
 
 	/* CBI form tabs only, not the mode switcher: a long label overflowed its column by 28.6px at
-	 * 320px/Large, EN measured 0 — docs/chrome.md "Tab strips" has the measurement */
+	 * 320px/Large, EN measured 0 */
 	.cbi-tabmenu > li {
 		max-width: 100%;
 	}
@@ -91,8 +91,8 @@
 	}
 
 	/* one ring for both states, on --fs-focus-ring-solo: base's outline is invisible on the active
-	 * pill, whose background is the same accent — docs/chrome.md "Tab strips" has the contrast
-	 * numbers. box-shadow, not outline, because the strip clips and a shadow is not */
+	 * pill, whose background is the same accent. box-shadow, not outline, because the strip clips
+	 * and a shadow is not */
 	#tabmenu ul.tabs > li > a:focus-visible,
 	.tabs > li > a:focus-visible,
 	.cbi-tabmenu > li > a:focus-visible {

@@ -20,8 +20,8 @@ import { ROOT, read } from './lib/root.mjs';
 
 /* Keep a Changelog's order, `Performance` and `Development` appended (docs/releasing.md). The RU mirror's
  * names are the same list in the same order — that is what lets the two files be compared by INDEX rather
- * than by name, so only the prose language may differ. `Development` (index 7) is for what a router never
- * shows: release-notes.sh leaves it out of the release page. */
+ * than by name, so only the prose language may differ. `Development` (index 7) stays unused: the changelog records
+ * only what a theme user sees (docs/releasing.md), and release-notes.sh would leave it out anyway. */
 const CANON = {
 	'CHANGELOG.md':    ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Performance', 'Development'],
 	'CHANGELOG_ru.md': ['Добавлено', 'Изменено', 'Устарело', 'Удалено', 'Исправлено', 'Безопасность', 'Производительность', 'Разработка'],

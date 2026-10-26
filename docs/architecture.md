@@ -3,17 +3,13 @@
 What LuCI expects from a theme on OpenWrt 24.10.3+ and 25.12+, and where footstrap plugs into it.
 Read this first if you are new to the codebase.
 
-> Verified against `openwrt/luci` at the commit pinned in
-> `luci-theme-footstrap/luci-upstream.pin`, against the `openwrt-24.10` branch, and on a live
-> OpenWrt 25.12 router.
-
 ## A theme is a server shell plus client assets
 
 LuCI runs on ucode, not Lua, since 23.05: dispatcher in `/usr/share/ucode/luci/dispatcher.uc`,
 templates as `*.ut` under `/usr/share/ucode/luci/template/`.
 
-**Page content is rendered on the client.** The server sends a shell — header, an empty
-`<div id="view">`, footer — and `luci.js` instantiates the page's view module from
+**Page content is rendered on the client.** The server sends a shell (header, an empty
+`<div id="view">`, footer), and `luci.js` instantiates the page's view module from
 `/www/luci-static/resources/view/**`.
 
 So a theme is **a server shell (header/footer in ucode) + CSS + client JS for the menu**. No Lua,
@@ -38,7 +34,7 @@ header.
 (`modules/luci-base/ucode/` exists there) and carries everything the theme uses: `ctx.path`,
 `ctx.request_path`, `entityencode`, `striptags`, `dispatcher.build_url/lookup/lang`, `ubus.call`,
 `pkgs_update_time`. The `L.env` blob luci-base's own `header.ut` prints is **byte-identical**
-between branches, so `L.env.dispatchpath` — which the menu and the SPA router depend on — exists in
+between branches. So `L.env.dispatchpath`, which the menu and the SPA router depend on, exists in
 both.
 
 **The one difference is the package manager**: apk on 25.12+, opkg/`.ipk` on 24.10. CI builds both
@@ -79,7 +75,9 @@ Three things follow:
 7. Emit the empty menu containers: `#topmenu`, `#tabmenu`, `#modemenu`, `#indicators`.
 
 **`data-page` on `<body>` matters**: luci-base and app CSS target pages through it
-(`[data-page="admin-status-overview"]`).
+(`[data-page="admin-status-overview"]`). footstrap's own page-scoped rules never key off
+`body[data-page]`: under the SPA router they use `:where(#view)[data-page]` or
+`.fs-content[data-page]`, see [spa-router.md](spa-router.md#the-staging-window).
 
 Variables a theme template gets: `theme`, `media`, `resource`, `ctx`, `dispatcher`, `dispatched`,
 `node`, `version`, `config`, `blank_page`, `css`, `lua_active`, `http`, `ubus`.
@@ -91,21 +89,19 @@ Variables a theme template gets: `theme`, `media`, `resource`, `ctx`, `dispatche
   template** — they are `:root[data-layout]` plus CSS.
 - **`data-page` is built from the dispatch path**, `join('-', length(ctx.path) ? ctx.path :
   ctx.request_path)` — the reverse of bootstrap's order. On a firstchild route (`/admin/status`
-  renders overview) `request_path` is only `['admin','status']`, so `body[data-page=
-  'admin-status-overview']` rules and the overview include silently did not apply.
+  renders overview) `request_path` is only `['admin','status']`.
 - The first element in `<body>` is a skip link; the content container is
   `<main class="fs-main" id="maincontent" tabindex="-1">`; the menu is `<nav class="fs-sidebar">`.
   Not `<aside>` — that carries the `complementary` role, which no landmark jump reaches.
-- The document heading is `<h1 class="fs-title-main">` carrying `.fs-sr`, **clipped, not
-  `hidden`**: `hidden` is `display:none`, which drops the element out of the accessibility tree, so
-  the `<h1>` effectively did not exist while the SPA router dutifully updated it.
+- The document heading is `<h1 class="fs-title-main">` carrying `.fs-sr`, clipped, not `hidden`
+  ([chrome.md](chrome.md)).
 - `partials/head.ut` sends `cascade.css`, `node.css` and `cbi.js` with `?v={{ pkgs_update_time }}`
   (uhttpd sends no `Cache-Control`) and passes every
   interpolation through `entityencode(striptags(...))`.
 
 ## `sysauth.ut` is mandatory for a theme with its own chrome
 
-luci-base's generic `sysauth.ut` opens with `{% include('header') %}` — **without `blank_page`** —
+luci-base's generic `sysauth.ut` opens with `{% include('header') %}` **without `blank_page`**,
 while the theme's header hides its whole shell behind `{% if (!blank_page) %}`. Without a
 theme-local `sysauth.ut`, sidebar, menu and footer draw around the login form and every control in
 them is dead: there is no session yet.
@@ -116,14 +112,8 @@ The theme's `sysauth.ut` exists for exactly one line:
 {% include('header', { blank_page: true }) %}
 ```
 
-**The form is rendered by the SERVER.** Bootstrap's pattern — a hidden `<section>` plus a client
-view module — was tried here and produced a **blank page you could not log in from**: the view
-bootstraps before a session exists, its RPCs answer "Access denied", the promise rejects and
-`render()` never runs. Server rendering works with JS off, cannot be broken by a rejected promise,
-and needs no `luci-theme-bootstrap` installed. Do not go back.
-
-Login strings deliberately carry **no `msgctxt`**, so luci-base translates them in the ~40 languages
-this theme has no catalogue for — see [conventions.md](conventions.md).
+**The form is rendered by the server**: a client view would bootstrap before a session exists, and
+its RPCs would answer "Access denied". Server rendering also works with JS off.
 
 ## The menu is entirely client-side
 
@@ -131,7 +121,7 @@ The server header emits empty containers by id; client JS fills them. The footer
 with `L.require('menu-footstrap')` (it only calls `menu-footstrap-common`; `fs-chrome` is the
 renderer), then `L.require('fs-select')`.
 
-Menu JS lives in `htdocs/luci-static/resources/` — **not** in the theme directory — because
+Menu JS lives in `htdocs/luci-static/resources/`, **not** in the theme directory, because
 `L.require()` resolves against `resourcebase`. From there it pulls its dependencies through
 `'require <module> as <name>'` pragmas:
 
@@ -140,20 +130,15 @@ menu-footstrap        → menu-footstrap-common
 menu-footstrap-common → ui, fs-menutree, fs-chrome, fs-router,
                         fs-prefs, fs-sheets
 fs-select             (no requirer — the footer loads it directly)
-fs-overview           (PAGE MODULE — required by menu-footstrap-common when
-                         body[data-page] says the page is theirs, see below)
+fs-overview           (page module, see below)
 ```
 
 The graph is acyclic and the runtime enforces it: `require()` throws `DependencyError` on a cycle.
 
-**One module is loaded by PAGE, not by pragma.** `fs-overview` reshapes Status → Overview and
-does nothing anywhere else, because that page is `luci-mod-status`'s own — a
-theme may register a dispatcher node of its own (`fs-appearance` does, below), but that adds a
-route, it does not hand over one another package already owns. A `'require'` pragma, though, is a
-hard dependency — luci.js evaluates the module before the requirer's factory runs, on every admin
-page — so `menu-footstrap-common.js`
-carries a map from `data-page` to module name and requires the module when that page appears
-(server-stamped or router-stamped, the same attribute either way). The loader owns the observer on
+**One module is loaded by page, not by pragma.** `fs-overview` works on Status → Overview only,
+a page `luci-mod-status` owns. A `'require'` pragma would load it on every admin page, so
+`menu-footstrap-common.js` carries a map from `data-page` to module name (`PAGE_MODULES`) and
+requires the module when that page appears (server-stamped or router-stamped). The loader owns the observer on
 `body[data-page]` and calls the module's `wire()` on every stamp; `wire()` re-checks the page
 itself (`onPage()`). The map repeats a page name the module also tests, so the two must be edited
 together.
@@ -163,7 +148,7 @@ together.
 `view/footstrap/appearance.js`), which requires it by pragma like any ordinary view.
 
 **There is no update checker, and nothing that loads one.** The installer adds the owfeed-packages
-feed, so `apk upgrade` / `opkg upgrade` carries the theme forward, and a settings page has no
+feed, so `apk upgrade` / `opkg upgrade` carries the theme forward. A settings page has no
 business reaching GitHub to reimplement that. `fs-version.js` reports the installed version with no
 request at all. Nothing globs for an optional file at render time either: the wallpaper pattern is an
 upload, so the server hands the client its cache-bust token like any other saved value.
@@ -181,9 +166,7 @@ config internal 'themes'
     option Footstrap '/luci-static/footstrap'       # the list the dropdown is built from
 ```
 
-**Exactly one entry.** Bootstrap registers a symlinked theme per mode (`BootstrapDark`, …);
-footstrap does not, because mode, palette and layout are client axes. Details:
-[package.md](package.md).
+Exactly one entry: [package.md](package.md).
 
 ## The runtime layout on the router
 
@@ -192,13 +175,22 @@ footstrap does not, because mode, palette and layout are client axes. Details:
 ```
 /usr/share/ucode/luci/template/themes/footstrap/
         header.ut, footer.ut, sysauth.ut, partials/*.ut
-/www/luci-static/footstrap/            cascade.css (generated), fonts/, logo.svg
-                                       (+ pattern.svg — a symlink to /etc/footstrap, uploaded)
-/www/luci-static/resources/            menu-footstrap.js, menu-footstrap-common.js, fs-*.js
+/www/luci-static/footstrap/            cascade.css (generated), logo.svg, logo_48.png,
+                                       app-icon-192.png, manifest.json
+                                       bg -> /etc/footstrap/login-bg, fonts -> /etc/footstrap/fonts
+                                       (symlinks made by uci-defaults)
+/www/luci-static/resources/            menu-footstrap.js, menu-footstrap-common.js, fs-*.js,
+                                       view/footstrap/appearance.js
+/www/cgi-bin/luci-theme-footstrap-pattern      serves the uploaded pattern under CSP
 /usr/lib/lua/luci/i18n/footstrap.<lang>.lmo    shipped by luci-i18n-footstrap-<lang>, not the theme package
-/usr/share/rpcd/acl.d/luci-theme-footstrap.json      ACL: uci footstrap + login-bg upload
+/usr/share/luci/menu.d/luci-theme-footstrap.json     the System → Footstrap route
+/usr/share/rpcd/acl.d/luci-theme-footstrap.json      ACL: uci footstrap, login-bg and pattern uploads
+/etc/config/footstrap                                router defaults (a conffile)
 /etc/uci-defaults/30_luci-theme-footstrap            registration
+/lib/upgrade/keep.d/luci-theme-footstrap             keeps the uploads across sysupgrade
 ```
+
+The pattern is not a symlink into `/www`: the CGI serves it, so a direct open runs under CSP.
 
 ## Where the boundary runs
 
@@ -211,54 +203,10 @@ top bar, logo and indicators, and re-order the stock overview sections.
 The theme **cannot** turn the overview into a KPI dashboard with a memory ring and sparklines —
 that is a view module in a separate `luci-app-*`.
 
-The single exception is `fs-overview.js`: a layout-only, additive include that moves stock overview
-sections (System left, Memory/Storage right) and draws no content of its own.
+`fs-overview.js` is a page module (`PAGE_MODULES` in `menu-footstrap-common.js`). It rearranges
+the stock overview sections, marks the meters (`data-fs-level`) and makes card headings
+disclosures. The data stays `luci-mod-status`'s.
 
-## The SVG sanitizer's residual, verified-safe findings
+## Uploaded images
 
-`fs-assets.js`'s `_sanitizeSvg` — the wallpaper PATTERN upload only (`PATTERN.prepare`);
-the login-background upload is a photo, downscaled by `_downscale`, never parsed as XML — walks the
-parsed DOM once. Elements and references are judged by what may stay; script-capable SVG elements,
-event handlers and off-document CSS are still matched by name:
-
-- **Elements:** only the SVG namespace. Every element in another namespace goes — XHTML, MathML and
-  an editor's metadata alike — and so do `<foreignObject>` and the SVG elements that can run script.
-  An animation (`animate`, `set`, `animateTransform`, `animateMotion`, `animateColor`) goes only when
-  its `attributeName` is a URL-valued attribute (`href`, `ping`, any prefix): WebKit followed
-  `<animateTransform attributeName="href">` to a same-origin `translate(…)` path on a click. Colour,
-  rotation and motion animations stay; their `values`/`from`/`to`/`by` go through the CSS rule below.
-  Foreign-namespace elements go because XHTML inside SVG can run script and fetch
-  (`<h:frame src="javascript:…">`, `h:img`, `h:meta refresh`) on a direct open. A full Inkscape
-  export (`sodipodi:namedview`, `rdf:RDF`) therefore reports itself cleaned; nothing it draws is lost.
-- **`href` / `xlink:href` / `ping`:** every URL-valued attribute is stripped the way the WHATWG URL parser strips (every TAB/LF/CR, then
-  leading spaces — XML 1.0 admits no other C0 control; not JavaScript's `trim()`, which also eats NBSP and U+FEFF and let
-  `&#160;data:…/../x` resolve as a same-origin path), then kept only as a same-document `#fragment`,
-  or as a raster `data:` URL (png, jpeg, gif, webp, avif, bmp) on an `<image>`.
-- **CSS:** an attribute with no namespace (the presentation attributes and `style`) and a `<style>`
-  element's direct text are dropped when, CSS-unescaped, they reach off-document: `url(` to anything
-  but a `#fragment`, `@import`, `expression(`, `image-set(`, `image(`, `src(`, `cross-fade(`. The image
-  functions match only as a function token, the name directly followed by `(`, so
-  `inkscape:label="image (2)"` stays; `url` and `expression` also match with whitespace before `(`.
-  Whitespace means CSS whitespace only (space, TAB, LF, CR, FF): `url(&#160;#a)` is a path to CSS, not
-  a fragment, and fetched `/%C2%A0` before.
-  A `style` attribute loses the offending declaration, any other attribute is removed. CR LF, CR and FF are folded
-  to LF before escapes are decoded (CSS Syntax §3.3), so `u\72&#13;&#10;l(` is still `url(`. A
-  `<style>` with an element child is removed whole: the CSS engine reads only the direct text, and
-  `<style>@imp<x>z</x>ort …</style>` reads as `@import` while its `textContent` does not.
-- **`xml:base`** is removed.
-
-A self-contained `<style>` stays: in image mode it cannot fetch or run anything, and stripping it lost
-the look of every pattern drawn by a design tool. One residual stays open on purpose, because it is
-closed by something outside this file rather than by the walk itself — record kept here since the
-code comment limit (`docs/conventions.md`, "Comments") is 1-2 lines.
-
-- **A `<!DOCTYPE svg SYSTEM "…">` prologue** is a document-level construct the walk never visits
-  (`doc.doctype` is left as parsed) and survives `XMLSerializer` byte for byte. Costs nothing today:
-  no shipping engine resolves an external DTD for any document, `image/svg+xml` included, and a
-  direct open of the file is answered by the CGI's `Content-Security-Policy: default-src 'none';
-  sandbox`. Starts mattering the day some consumer resolves an external DTD, or the file is served
-  without that header. Internal entities and `ATTLIST` defaults land in the DOM before the walk and
-  are judged like any other node; `XMLSerializer` drops the internal subset.
-
-The CGI's CSP is the second wall. The CGI does not validate the bytes itself: an admin's direct
-`cgi-upload` POST skips the client walk.
+The rules for the pattern upload's SVG sanitizer: [package.md](package.md#uploaded-images).

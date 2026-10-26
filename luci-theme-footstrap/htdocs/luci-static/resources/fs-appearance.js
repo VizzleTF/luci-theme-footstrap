@@ -141,7 +141,7 @@ function colorControl(onPick, label, o) {
 		const v = field.value.trim().toLowerCase();
 		if ((/^#[0-9a-f]{6}$/).test(v)) pick(v);
 		/* re-read rather than a cached copy: the page can change what the axis holds behind this
-		 * control (a preset, Reset to default), which a snapshot taken at build time would miss */
+		 * control (a preset, Reset to built-in), which a snapshot taken at build time would miss */
 		else reflect(o.read());
 	};
 	field.addEventListener('input', () => { typed = true; });

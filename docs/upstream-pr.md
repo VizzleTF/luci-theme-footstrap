@@ -1,8 +1,7 @@
 # The pull request to openwrt/luci
 
-The theme lives upstream since 2026-08-20. Code is almost always accepted; PRs bounce on **form**:
-how the commits are cut and how long the messages are. The median commit body in openwrt/luci is
-three lines and says WHAT changed.
+How to carry a footstrap release into `themes/luci-theme-footstrap` of openwrt/luci and get it merged.
+Upstream PRs bounce on form, rarely on code: how the commits are cut and how long the messages are.
 
 ## Order
 
@@ -18,9 +17,8 @@ three lines and says WHAT changed.
 
 ### How many commits
 
-A release sync splits by concern — cleanup, API removal, router/SPA, security, CSS. The model is
-the merged #9111 (sync with 0.14.14): six commits. A sync squashed into one commit was sent back for
-exactly that. Small PRs: one fix, one commit.
+A release sync splits by concern: cleanup, API removal, router/SPA, security, CSS. A sync squashed
+into one commit is sent back. A small PR is one fix, one commit.
 
 ### Message form
 
@@ -32,23 +30,16 @@ What changed, one or two sentences, wrapped at 72 columns.
 Signed-off-by: Ivan Kvashonkin <vizzlef@gmail.com>
 ```
 
-| | upstream norm |
-|---|---|
-| body | median 3 lines, p90 15 |
-| subject | median 47 chars, soft limit 60, hard 80 |
-| links and `#NNNN` in the body | absent in 90 % of commits |
-| wrap | **72 columns** (the bot's limit is 100; 72 is ours) |
-
-Subject: package prefix, colon, lowercase, no final period; shared infrastructure (`luci.mk`)
+Subject: at most 60 characters (the bot's hard limit is 80), package prefix, colon, lowercase, no final period; shared infrastructure (`luci.mk`)
 takes `treewide:` (the bot rejects `luci.mk:`). Investigation and measurements live in our
 changelog and code comments, not in the upstream body.
 
 ### Hard rules (each one paid for by a bounce)
 
 - The commit body carries no `#NNNN` and no link: a force-push re-sends every mention.
-- No compatibility with EOL releases (23.05 refused twice; 24.10 is next).
+- No compatibility with EOL releases.
 - The theme names no outside site and no repository of its own.
-- No migrations "just in case": OpenWrt assumes a full image upgrade.
+- No speculative migrations: OpenWrt assumes a full image upgrade.
 - `po/` stays out: Weblate owns it.
 - Release branches (`openwrt-25.12`, …) take bug and security fixes only.
 - `Makefile` is edited on the luci side by hand (`sync-luci-fork.sh` does not carry it), mirroring
@@ -56,9 +47,9 @@ changelog and code comments, not in the upstream body.
 
 ### Already refused — do not offer again
 
-1. 23.05 compatibility — "We are the upstream project. We don't need to keep adding compatibility
-   code for old releases just because it happens to be possible".
-2. A footer link to an outside site — "None of the other themes do that".
+1. 23.05 compatibility — "*We are the upstream project. We don't need to keep adding compatibility
+   code for old releases just because it happens to be possible*".
+2. A footer link to an outside site — "*None of the other themes do that*".
 3. A long `uci-defaults` with old-version cleanup.
 
 ### Checklist before `gh pr create`
@@ -69,14 +60,14 @@ changelog and code comments, not in the upstream body.
 - [ ] `Signed-off-by` on every commit; author is the real full name, never a
       `@users.noreply.github.com` address
 - [ ] branch is not `master` and names the change
-- [ ] preflight green, security review (Preflight 7) done
+- [ ] preflight green, security review (Preflight 5) done
 - [ ] `diff -r` tip == tag (Step 3)
 - [ ] no `po/`, none of our build scripts; `Makefile` only as a mirror of ours
 
 ## Building the branch
 
 Upstream keeps the built `cascade.css`, not `styles/`, so every PR commit carries its own slice of
-the finished sheet: the branch is built by **replaying** states of our tree, never by moving
+the finished sheet. The branch is built by **replaying** states of our tree, never by moving
 `main`'s commits across.
 
 | Path | Role |
@@ -143,8 +134,9 @@ git -C ../tmp/fs-hist checkout --quiet upstream-N
 diff -r -x Makefile -x po ../tmp/luci-ref/themes/luci-theme-footstrap $LUCI/themes/luci-theme-footstrap && echo "tip == tag"
 ```
 
-`sync-luci-fork.sh` exits 1 when a file mode differs from our index, or when a shipped file references something outside the tree (`../tmp/`,
-`tools/`, a test file, stands, `issue #N`, a commit hash); read its whole output.
+`sync-luci-fork.sh` exits 1 in two cases: a file mode differs from our index, or a shipped file
+references something outside the tree (`../tmp/`, `tools/`, a test file, stands, `issue #N`, a
+commit hash). Read its whole output.
 
 ### Step 4. Cut the PR commits
 
@@ -193,12 +185,12 @@ After the merge: `git worktree remove ../tmp/fs-hist`, `git -C $LUCI worktree re
 ### Traps
 
 - The author must be "First Last"; the clone inherits the global `VizzleTF` and bounces.
-- Upstream keeps `cascade.css` **unminified** and with **unmangled tokens** on purpose.
+- Upstream gets the minified `cascade.css` with unmangled tokens; templates, shell and JS travel unminified.
 
 ## Preflight
 
-All of it runs before the **first** push: what the upstream bot flags, a local run catches. The PR carries the latest tag's tree, so sections 4, 5 and 6 run in
-`../tmp/fs-hist` detached at the tag
+All of it runs before the first push: what the upstream bot flags, a local run catches. The PR
+carries the latest tag's tree, so section 4 runs in `../tmp/fs-hist` detached at the tag
 (`git -C ../tmp/fs-hist checkout --quiet --detach $(git describe --tags --abbrev=0)` from our root).
 
 0. **Review the branch diff** (`git -C ../tmp/luci-pr diff origin/master..`, with
@@ -211,7 +203,8 @@ All of it runs before the **first** push: what the upstream bot flags, a local r
    5. dead exports nothing imports;
    6. a visible behaviour change the commit body does not mention;
    7. formalities (subject, body lines, `Signed-off-by`, no link in a body).
-1. **Our check**: the tag's CI run has `e2e` green on both routers ([verifying.md](verifying.md)).
+1. **Our check**: the tag's CI run has `e2e` and `anchor` green on both routers
+   ([verifying.md](verifying.md)). `e2e` renders every template with the router's own ucode.
 2. **Their eslint on our files**, from their checkout's own `package.json` — their config lists
    globals by hand and does not read the `'require X as Y'` pragma:
    ```sh
@@ -219,22 +212,16 @@ All of it runs before the **first** push: what the upstream bot flags, a local r
    node_modules/.bin/eslint themes/luci-theme-footstrap/htdocs | grep "is not defined"
    ```
    A warning on an alias is their config's defect; a warning on a real typo is a fix.
-3. **Their formalities** (`.github/formalities.json` in the clone): subject soft 60 / hard 80, body
-   required and not a repeat of the subject, `Signed-off-by` matching the author, a real full name,
-   branch not `master`/`main`, no merge commits, no CRLF.
+3. **Their formalities** (`.github/formalities.json` in the clone). Subject soft 60 / hard 80. Body
+   required and not a repeat of the subject. `Signed-off-by` matching the author, a real full name.
+   Branch not `master`/`main`, no merge commits, no CRLF.
    ```sh
    awk 'length > 72 {print FILENAME": "FNR": "length}' <message files>   # empty
    head -1 <file> | wc -c                                                # ≤ 61 with the newline
    ```
-4. **Templates compile** in a stand, after section 5's `owlab sync` from `../tmp/fs-hist`:
-   ```sh
-   docker exec <stand container> sh -c 'for f in $(find /usr/share/ucode/luci/template/themes/footstrap -name "*.ut"); do
-     ucode -T -c -o /dev/null "$f" || echo "FAILS: $f"; done; echo done'
-   ```
-5. **Live on both package managers**: `owlab sync owrt2512 owrt2410`.
-6. **Size** (reviewers ask):
+4. **Size** (reviewers ask):
    `du -sb luci-theme-footstrap/ucode luci-theme-footstrap/htdocs/luci-static/resources`.
-7. **Security review** of the final branch against the previous synced tag, as in
+5. **Security review** of the final branch against the previous synced tag, as in
    [releasing.md](releasing.md) Step 2. First look: the signature chain in `install.sh`, new shell scripts, the login template (unauthenticated), sinks
    in the browser JS, build pipeline changes.
 
@@ -251,8 +238,7 @@ A review by anyone other than `openwrt-ai` comes first.
 
 ### The bot (`openwrt-ai`)
 
-1. **Measure whether it is right** — it is wrong noticeably more often than a person, and right
-   often enough that every remark is checked.
+1. **Check every remark** before acting on it: the bot is wrong often enough.
 2. A real defect: fix it on our `main` so the next tag carries it, and bring the same change into
    the commit it belongs to here (amend or fixup). Step 3 then runs against tag + fixes:
    ```sh

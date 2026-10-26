@@ -71,7 +71,7 @@ fi
 # merge onto an existing /usr is ambiguous. Two subtrees are excluded by behaviour, handled below:
 #   - etc/uci-defaults runs from /tmp; in /etc/uci-defaults the next boot would run and DELETE it.
 #   - etc/config holds conffiles, which the package manager keeps on upgrade and so must we: the
-#     live file holds the admin's "Save as default".
+#     live file holds the admin's "Save to router".
 set --
 for _d in "$D"/root/*/; do set -- "$@" "$(basename "$_d")"; done
 tar -C "$D/root" --mode=u=rwX,go=rX --exclude=etc/uci-defaults --exclude=etc/config -cf - "$@" |

@@ -12,7 +12,7 @@ Every page here stands on its own — start wherever your question is.
 | [architecture.md](architecture.md) | What LuCI expects from a theme, and where footstrap plugs into it |
 | [conventions.md](conventions.md) | The rules a patch must follow, and why |
 | [development.md](development.md) | Bring up a dev router, push a change, prove it works |
-| [verifying.md](verifying.md) | The one check (`tools/e2e.mjs`): what it proves, running it, reading its CI artifacts; the per-area invariants |
+| [verifying.md](verifying.md) | The router checks (`tools/e2e.mjs`, `tools/anchor-check.mjs`): what they prove, running them, reading their CI artifacts |
 
 ## How it is built
 
@@ -29,7 +29,7 @@ Every page here stands on its own — start wherever your question is.
 | Page | Answers |
 |---|---|
 | [package.md](package.md) | Source tree, Makefile, uci-defaults, postinst/postrm |
-| [ci.md](ci.md) | The CI job graph, the e2e job, packaging and releases |
+| [ci.md](ci.md) | The CI job graph, the `e2e` and `anchor` jobs, packaging and releases |
 | [releasing.md](releasing.md) | The pre-release checklist, the changelog contract, the runbook |
 | [upstream-pr.md](upstream-pr.md) | The theme's pull request to openwrt/luci: building, preflight, review |
 | [benchmark.md](benchmark.md) | The navigation benchmark: method and results |

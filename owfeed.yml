@@ -73,7 +73,7 @@ packages:
     # that PKG_RELEASE:=1 puts on every asset name.
     version-from: file:./dist/VERSION
     files: ./dist/root
-    # Zopfli deflate: the figures and the .apk caveat are in docs/ci.md, "Zopfli packages".
+    # Zopfli deflate; the .apk caveat is in docs/ci.md, "Zopfli packages".
     compression: zopfli
 
     description: "A modern, fast LuCI theme."

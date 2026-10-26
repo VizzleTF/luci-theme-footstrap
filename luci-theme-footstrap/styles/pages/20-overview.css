@@ -101,11 +101,11 @@
 		width: 100%;
 		margin: var(--fs-space-0-5) 0 var(--fs-space-1);
 	}
-	/* no status dot: speed + zone bar report carrier, -webkit-box lays children as lines */
+	/* no status dot: speed + zone bar report carrier */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-head:first-child {
 		flex: 0 0 auto;
 		width: 100%;
-		/* clamped to 2 lines never 3: unclamped nowrap name sets every tile's min width */
+		/* one line (nowrap from .ifacebox), ellipsised: without min-width: 0 a long name sets every tile's min width */
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -196,7 +196,7 @@
 	}
 
 	/* per-row dividers dropped, keyed on table SHAPE (no .th, no 3rd .td — same test as
-	 * 30-tables.css's key/value rule, docs/css.md "The key/value discriminator") not on the
+	 * 30-tables.css's key/value rule, docs/css.md "Tables: the key/value discriminator") not on the
 	 * three named cards. attendedsysupgrade's 11_upgrades.js (a stock header row) keeps its
 	 * dividers under this test. */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .td,

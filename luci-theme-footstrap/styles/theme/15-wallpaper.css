@@ -21,7 +21,7 @@
 		opacity: var(--fs-pattern-strength);
 	}
 	/* Theme ink (default): file's own colours discarded, only alpha used through the mask —
-	 * design-system.md, "Pattern colours". */
+	 * design-system.md, "The appearance axes". */
 	:root[data-wallpaper="pattern"]:not([data-pattern-ink="original"]) .fs-pattern {
 		background-color: var(--fs-text);
 		-webkit-mask-image: var(--fs-pattern-url);

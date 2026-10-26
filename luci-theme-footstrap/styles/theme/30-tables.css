@@ -156,7 +156,7 @@
 	/* --- KEY/VALUE: "no id" is not enough — GridSection also renders no-id .cbi-section-table,
 	 * excluded along with .fs-dt and the legend's inline table-layout. Shape, not a class, says
 	 * data table: any .th or a 3rd .td rules a table out — a real key/value row is exactly 2 .td
-	 * and no .th. docs/css.md, "The key/value discriminator". */
+	 * and no .th. docs/css.md, "Tables: the key/value discriminator". */
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.th)):not(:has(.td:nth-child(3))):not([style*="table-layout"]) .td:first-child {
 		color: var(--fs-dim); font-weight: var(--fs-weight); width: 40%; white-space: nowrap;
 	}

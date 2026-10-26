@@ -1,10 +1,9 @@
 # Fonts
 
 The theme ships **no webfonts**. `--fs-font-sans` and `--fs-font-mono` name Manrope and JetBrains
-Mono first and the system stack after, so a visitor who has either installed locally sees the theme
-drawn in it and everyone else falls through to `system-ui` / `ui-monospace` — no request, no 404, no
-flash. That is the default and for most routers it is the right one: the faces were 48 % of the
-package.
+Mono first and the system stack after. A visitor who has either font installed locally sees the theme
+drawn in it. Everyone else falls through to `system-ui` / `ui-monospace`: no request, no 404, no
+flash. That is the default, and for most routers it is the right one.
 
 This directory holds the script that puts a font back, if you want one. Run it on the router, as
 root:
@@ -13,8 +12,8 @@ root:
 wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/fonts/set-font.sh | sh -s -- --sans Inter
 ```
 
-Nothing here is bundled with the theme and **no font is named or hosted in this repository** — a
-family shortcut would be somebody else's licence and somebody else's host written into the package.
+Nothing here is bundled with the theme, and **no font is named or hosted in this repository**. A
+family shortcut would write somebody else's licence and somebody else's host into the package.
 You bring the file or the URL; the theme never fetches anything at run time.
 
 ## The two ways, and they are independent
@@ -29,10 +28,10 @@ uci set footstrap.settings.font_sans='Inter, system-ui, sans-serif'
 uci commit footstrap
 ```
 
-A value with a comma in it is used as a **complete stack**; a bare name gets the theme's own
+A value with a comma in it is used as a **complete stack**. A bare name gets the theme's own
 fallbacks appended, which is what you want unless you are deliberately dropping them.
 
-**A name and a file.** `--sans Inter --sans-file …` also writes the `.woff2` into
+**A name and a file.** `--sans Inter --sans-file …` also writes the `.woff2` or `.woff` into
 `/etc/footstrap/fonts/`, generates an `@font-face` sheet beside it and points the theme at both.
 Now **this router serves the font**, so every visitor sees it whatever they have installed.
 
@@ -56,16 +55,16 @@ is left exactly as it is, so the two commands above compose.
 
 ## Weights, and the one setting worth understanding
 
-footstrap sets body text at **600** and titles and labels at **700** (`--fs-weight`,
-`--fs-weight-bold`). What a face *claims* therefore decides whether any of that is visible:
+footstrap sets body text, labels and controls at **600**, and titles and table headers at **700**
+(`--fs-weight`, `--fs-weight-bold`). What a face *claims* therefore decides whether any of that is visible:
 
-- **one static face** — leave `--sans-weight` alone. It is declared `400`, the browser synthesises
+- **one static face**: leave `--sans-weight` alone. It is declared `400`, the browser synthesises
   600 and 700, and the page reads as designed. Declared `400 700` instead, that single face would
   cover both and every heading would render in the regular one: the hierarchy flattens and nothing
   reports an error.
-- **a variable font** — pass `--sans-weight '100 900'` (or whatever the face's range is). Real
+- **a variable font**: pass `--sans-weight '100 900'` (or whatever the face's range is). Real
   weights beat synthesised ones.
-- **two static faces** — the split lands on 600, not 700: regular claims `400 600` (so body text is
+- **two static faces**: the split lands on 600, not 700. Regular claims `400 600` (so body text is
   set in it) and bold claims `700`. That is the default when `--sans-bold-file` is given.
 
 The mono side defaults to `400` and needs no bold: the theme *assigns* `<strong>` the sans face
@@ -74,25 +73,26 @@ deliberately, so there is no bold mono to feed.
 ## What the script refuses
 
 - **anything that is not a woff2 or woff**, decided by the first four bytes rather than by the
-  file name. A raw `.ttf` or `.otf` is refused with the command to convert it — there is no
-  compressor on a router and the same face is three to five times the bytes uncompressed:
+  file name. A raw `.ttf` or `.otf` is refused with the command to convert it. A router has no
+  compressor, and the same face is three to five times the bytes uncompressed. Convert it with
   `fonttools ttLib.woff2 compress Face.ttf`, or `woff2_compress` from google/woff2.
 - **anything over 512 kB** per face (`--max` raises it). A Latin+Cyrillic variable face subset for a
   UI lands well under that; a full unsubsetted family does not.
 - **a family name outside `A-Za-z0-9 ,._"'-`**, 120 characters at most. The name is printed into the
-  page unescaped, and that charset is what makes it safe — it contains no way to close an element or
+  page unescaped, and that charset is what makes it safe. It contains no way to close an element or
   start a second declaration. A Cyrillic or CJK family carries a Latin name too; use that one.
 - **a download over an unverified channel.** Certificates are always checked, there is no `-k`
-  anywhere and no fallback to one: this runs as root, and a failed verification is the MITM case.
+  anywhere and no fallback to one. The script runs as root, and a failed verification is the MITM
+  case.
 
-A refusal leaves the router exactly as it was — every file is fetched and checked before anything is
+A refusal leaves the router exactly as it was: every file is fetched and checked before anything is
 written.
 
 ## Where it all lands
 
 | path | what |
 |---|---|
-| `/etc/footstrap/fonts/*.woff2` | the faces, 0644 (uhttpd 403s on anything less) |
+| `/etc/footstrap/fonts/*.woff2`, `*.woff` | the faces, 0644 (uhttpd 403s on anything less) |
 | `/etc/footstrap/fonts/fonts.css` | the generated `@font-face` sheet — `@font-face` only, no `:root` |
 | `/etc/footstrap/fonts/faces` | what is installed, so a later run can regenerate the sheet |
 | `/www/luci-static/footstrap/fonts` | a symlink; uhttpd serves only `/www` |
@@ -110,5 +110,5 @@ preference.
 ## Licence
 
 `set-font.sh` is Apache-2.0, like the rest of this repository. The font you install is yours to
-comply with — most open faces are SIL OFL 1.1, which requires the licence to travel with the Font
+comply with. Most open faces are SIL OFL 1.1, which requires the licence to travel with the Font
 Software.

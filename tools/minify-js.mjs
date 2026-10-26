@@ -1,7 +1,7 @@
 /* Pre-minify the theme's shipped JS with uglify-js, in place, for the owfeed release build.
  *
  * uglify-js rather than jsmin, which strips comments and whitespace only and mangles nothing; it also
- * beat terser 5.51.2 by 2,687 B (docs/ci.md, "The steps", step 2). Top-level mangling is safe
+ * beat terser 5.51.2 by 2,687 B. Top-level mangling is safe
  * because a LuCI resource file is evaluated inside a function wrapper and everything crossing a module seam goes through
  * undeclared globals (`L`, `E`, `_`, the pragma aliases), which uglify-js never renames. Runs from
  * tools/stage.sh over the STAGED payload, never the checkout. The two minifiers sit on disjoint
@@ -137,7 +137,7 @@ for (const f of files) {
 		parse: { bare_returns: true },
 		/* directives:false = do NOT remove them — the pragmas ARE directives. keep_fargs keeps
 		 * every function's arity. fs-version.js: evaluate would fold the literal into its readers
-		 * (the guard below); the bytes it costs are in docs/ci.md, step 2. */
+		 * (the guard below). */
 		compress: {
 			directives: false, passes: 3, keep_fargs: true,
 			...(isVersion ? { evaluate: false } : {})

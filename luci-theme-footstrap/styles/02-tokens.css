@@ -143,7 +143,7 @@
 		/* ceiling for an elastic `.cbi-value-field` (flex: 1) — a COLUMN width, off the 4px scale */
 		--fs-field-max: 440px;
 
-		/* every z-index comes from here */
+		/* every z-index but the content's own stacking (wallpaper -1, sticky table heads 1-2) */
 		--fs-z-raise: 2;
 		--fs-z-sticky: 50;
 		--fs-z-flyout: 70;

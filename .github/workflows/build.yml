@@ -1,7 +1,7 @@
 # luci-theme-footstrap is noarch: one build, two containers (apk for 25.12+, ipk for 24.10), both
 # out of owfeed rather than an OpenWrt SDK.
 #
-# One check: tools/e2e.mjs runs the package's whole life on a real OpenWrt of each package manager
+# Two checks: tools/e2e.mjs runs the package's whole life on a real OpenWrt of each package manager
 # (the last release, an upgrade to this build, every menu page against bootstrap, removal, a fresh
 # install), and tools/anchor-check.mjs runs beside it on a router of its own. The release pipeline
 # itself is owfeed's `package.yml`.

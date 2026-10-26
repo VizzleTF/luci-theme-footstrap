@@ -1,9 +1,9 @@
 # luci-theme-footstrap
 
 A LuCI theme for OpenWrt 24.10.3 and newer. It depends only on `luci-base`, styles every LuCI page
-including third-party `luci-app-*` pages, and leaves alone what an app styles itself. It works on a phone and installs to its home screen,
-and has 22 appearance settings (layout, palette, density, colours, wallpaper) that apply without a
-reload.
+including third-party `luci-app-*` pages, and leaves alone what an app styles itself. It works on a
+phone and installs to its home screen. Its 22 appearance settings (layout, palette, density,
+colours, wallpaper) apply without a reload.
 
 [Русский](README_ru.md) · [Playground: the theme in your browser, no router needed](https://vizzletf.github.io/luci-theme-footstrap/playground/)
 
@@ -14,8 +14,9 @@ reload.
 
 ## Install
 
-Needs OpenWrt 24.10.3 or newer (earlier 24.10 releases lack a LuCI widget the theme uses), and a browser from Chrome 108, Firefox 101 or Safari 15.4 on. On
-23.05 the installer installs 0.14.2: later versions use a LuCI widget that 23.05 lacks.
+Needs OpenWrt 24.10.3 or newer: earlier 24.10 releases lack a LuCI widget the theme uses. The
+browser must be Chrome 108, Firefox 101, Safari 15.4 or newer. On 23.05 the installer installs
+0.14.2: later versions use a LuCI widget that 23.05 lacks.
 
 Run as root on the router, over SSH:
 
@@ -23,8 +24,8 @@ Run as root on the router, over SSH:
 wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
 ```
 
-The script adds the theme's package feed, verifies the package's signature and checksum, installs the theme and prints what it did: installed,
-upgraded from a named version, or already current. Later versions arrive with the router's own
+The script adds the theme's package feed, verifies the package's signature and checksum, installs
+the theme and prints what it did: installed, upgraded from a named version, or already current. Later versions arrive with the router's own
 `apk upgrade` or `opkg upgrade`.
 
 If `raw.githubusercontent.com` answers 429 (a shared exit or CGNAT), run the copy attached to

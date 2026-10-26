@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Minify the inline <script> blocks inside the shipped templates: the largest bytes nothing shrank
  * (strip-build.sh only removes comments and indentation), in the HTML document before any module
- * is fetched. Measured in stage order, 6424 -> 4511 B (docs/ci.md).
+ * is fetched. Measured in stage order, 6424 -> 4511 B.
  *
  * ONLY blocks with no ucode interpolation are touched: a block containing `{{`, `{%` or `{#` (the
  * `window.__fsSD` data object in partials/head.ut) is not JavaScript and is left exactly as it is.

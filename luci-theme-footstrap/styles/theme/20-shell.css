@@ -387,7 +387,7 @@
 			:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
 		}
 		/* The flyout's heading reuses the bar's hover-bridge pseudo-element (issue #22) —
-		 * chrome.md, same heading as above. */
+		 * chrome.md, "A flyout's heading reuses the bar's hover-bridge pseudo-element". */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > ul[data-title]::before {
 			content: attr(data-title);
 			position: static; inset: auto; height: auto;

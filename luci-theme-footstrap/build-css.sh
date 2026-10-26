@@ -320,7 +320,7 @@ if [ "$DEV" -eq 0 ]; then
 		exit 1
 	fi
 fi
-# --dev: $TMP is still the raw concatenation — comments and formatting intact, for reading on a
+# --dev: $TMP keeps comments and formatting (only the @layer wrappers are merged), for reading on a
 # router rather than shipping.
 
 SIZE=$(wc -c < "$TMP" | tr -d ' ')
