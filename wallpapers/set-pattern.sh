@@ -8,7 +8,7 @@
 #   sh set-pattern.sh remove
 #
 # Run it ON THE ROUTER, as root. It does exactly what the Appearance page's upload does — write
-# /etc/footstrap/pattern.svg, expose it under /www, and save the file's md5 plus the wallpaper axes
+# /etc/footstrap/pattern.svg and save the file's md5 plus the wallpaper axes
 # into /etc/config/footstrap — so nothing here is a private path or a private convention.
 #
 # The theme itself never fetches this: a theme in a package feed has no business calling a
@@ -18,7 +18,6 @@ set -eu
 
 RAW="https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/wallpapers/svg"
 PAT_PATH="/etc/footstrap/pattern.svg"
-PAT_SERVE="/www/luci-static/footstrap/pattern.svg"
 PAT_MAX=524288					# 512 kB, the cap the upload page enforces
 
 info() { printf '[*] %s\n' "$1"; }
@@ -149,14 +148,10 @@ cat "$TMP" > "$PAT_PATH"
 # uhttpd refuses to SERVE a file that is not world-readable (measured: 0600 -> 403, 0644 -> 200).
 chmod 0644 "$PAT_PATH"
 
-# uhttpd serves only /www and types a response BY EXTENSION, so the exposed name keeps its .svg — an
-# SVG served as application/octet-stream is one no browser paints. uci-defaults makes this same link
-# on every install; repeated here for a router installed before it did.
-if [ -d /www/luci-static/footstrap ]; then
-	ln -sf "$PAT_PATH" "$PAT_SERVE"
-else
+# No link into /www: an SVG on a same-origin URL runs as script with the admin's session. The theme
+# serves the file through cgi-bin/luci-theme-footstrap-pattern under CSP 'none' + sandbox.
+[ -d /www/luci-static/footstrap ] ||
 	err "No /www/luci-static/footstrap — is the theme installed? The file is in place, but nothing serves it."
-fi
 
 # --- the settings ---------------------------------------------------------
 # `pattern` is the cache-bust token and nothing else: the browser appends it to the served URL, so
@@ -177,5 +172,5 @@ else
 	ok "Saved as the router's default wallpaper. Reload LuCI to see it."
 	info "A browser that has already chosen a wallpaper keeps ITS choice — every axis is"
 	info "per-browser first, the router's saved default second. On such a browser press"
-	info "System -> System -> Footstrap -> 'Reset to saved', or pick Pattern there by hand."
+	info "System -> Footstrap -> 'Reset to router', or pick Pattern there by hand."
 fi
