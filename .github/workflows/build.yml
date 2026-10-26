@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       # The github-pages environment accepts only `main` or a `v*` tag as a deployment branch, so a
-      # dispatch on any other ref reaches `pages-manual` but its deploy refuses.
+      # dispatch that asks for it on any other ref fails in the playground's first step.
       publish-pages:
         description: >-
           Deploy GitHub Pages with THIS run's own playground instead of the latest release's.
@@ -26,17 +26,28 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request supersedes its run. A re-run (rerun-infra.yml's, right after a run
+# ends, or a person's) waits for a newer run of the pull request instead of cancelling it. A push to
+# main, a tag or a dispatch is a group of its own, so it never waits on or cancels another run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.run_attempt == '1' }}
+
 # Every job carries a timeout: the default is six hours, and a stalled apt mirror or download is
 # not a failed step.
+#
+# Pinned, not ubuntu-latest: latest moves to 26.04 between 2026-10-19 and 2026-11-19, and a matrix
+# whose legs land on two images measures two sets of browser libraries. Move the pin on purpose.
 jobs:
   build:
     name: Build the packages
     timeout-minutes: 25
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
       # The source of truth for what the package may do over rpcd is the literal below; SECURITY.md
       # lists the same grants by hand, so a change here is a change there. rpcd loads every file in
       # acl.d and skips a malformed one silently: the directory must hold this one file, and jq must
@@ -65,20 +76,42 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      # Install scripts are off through the repo's .npmrc.
-      - run: npm ci
+      # Install scripts are off through the repo's .npmrc. npm's own retries end in an exit, not an
+      # outage title: a registry that stays down is red for a person.
+      - run: sh tools/ci-retry.sh 300 npm ci
+      # The section a tag would publish, generated now: a tag cannot be moved or deleted (ruleset
+      # 25550119), so a notes failure found by `release` burns the version.
+      - name: The newest changelog section makes release notes
+        run: |
+          ver=$(sed -n 's/^## \[\([0-9][^]]*\)\].*/\1/p' CHANGELOG.md | head -1)
+          [ "${GITHUB_REF_TYPE}" != tag ] || ver="${GITHUB_REF_NAME#v}"
+          sh tools/release-notes.sh "$ver" > /dev/null
       # The `uses:` ref is the pin Dependabot moves; an unset version installs that ref.
-      - uses: owfeed/owfeed/setup@v0.5.5
+      - uses: owfeed/owfeed/setup@v0.5.6
+        id: owfeedsetup
       # The SDK owfeed fetches on its first build (~60 s on a bare runner, 2 s with it here); the lock
-      # names the release points, so a new point is a new key.
-      - uses: actions/cache@v6
+      # names the release points, so a new point is a new key. So is a new owfeed: it checks the
+      # cache against files an older one did not keep, and a hit it rejects is fetched and never saved.
+      # A tag's packages come from an SDK fetched and verified now: owfeed's check of a cached SDK
+      # catches a damaged one, not a planted one.
+      - if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        id: owfeed
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/owfeed
-          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}
-      # The commit's timestamp: re-running a release over the same commit produces the same bytes.
+          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}-${{ steps.owfeedsetup.outputs.version }}
+      # The commit's timestamp: two builds of one commit pack the same bytes.
       - run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
       - run: ./tools/stage.sh
-      - run: owfeed build
+      # 8: owfeed's "upstream outage, safe to run again" (the SDK fetch); any other exit is the
+      # build's answer.
+      - timeout-minutes: 15
+        run: CI_RETRY_ON=8 sh tools/ci-retry.sh 240 owfeed build
+      - if: ${{ !startsWith(github.ref, 'refs/tags/') && steps.owfeed.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/owfeed
+          key: ${{ steps.owfeed.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v7
         with:
           name: owfeed-packages
@@ -95,10 +128,13 @@ jobs:
   # and waited for before the run. Every step after the first is gated on RUN: a change that touches
   # documentation alone passes without a router (tools/ci-package-changed.sh says why the steps skip
   # and not the job).
+  #
+  # Each cache is saved right after the step that fills it, not at the job's end: a leg that goes
+  # red later still keeps what it downloaded.
   e2e:
     name: The package's life on ${{ matrix.router }}
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -111,16 +147,32 @@ jobs:
             new: dist/all/luci-theme-footstrap_[0-9]*_all.ipk
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Does the change reach the package
         env:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.before) || '' }}
-        run: echo "RUN=$(sh tools/ci-package-changed.sh "$BASE")" | tee -a "$GITHUB_ENV"
+        # Anything but a plain `false` runs the checks: a gate that broke must not skip them green.
+        run: |
+          run=$(sh tools/ci-package-changed.sh "$BASE") || run=true
+          [ "$run" = false ] || run=true
+          echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
-        uses: owfeed/owlab/setup@v0.6.6
+        id: owlab
+        uses: owfeed/owlab/setup@v0.6.7
+      # The extras and compliance files owlab fetches by URL (pinned releases): a GitHub hiccup on
+      # any of them failed the build of the router. owlab fetches only the router it builds, so the
+      # key names the router.
+      - if: env.RUN == 'true'
+        id: owlabfetch
+        uses: actions/cache/restore@v6
+        with:
+          path: .owlab/cache
+          key: owlab-fetch-${{ matrix.router }}-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}
       - if: env.RUN == 'true'
         name: Start the router in the background
         run: |
-          (owlab up ${{ matrix.router }}; echo $? > "$RUNNER_TEMP/owlab-up.tmp" && mv "$RUNNER_TEMP/owlab-up.tmp" "$RUNNER_TEMP/owlab-up.rc") \
+          (sh tools/ci-stand.sh ${{ matrix.router }}; echo $? > "$RUNNER_TEMP/owlab-up.tmp" && mv "$RUNNER_TEMP/owlab-up.tmp" "$RUNNER_TEMP/owlab-up.rc") \
             > "$RUNNER_TEMP/owlab-up.log" 2>&1 < /dev/null &
       - if: env.RUN == 'true'
         uses: actions/setup-node@v7
@@ -128,57 +180,83 @@ jobs:
           node-version: '22'
           cache: npm
       - if: env.RUN == 'true'
-        run: npm ci
+        run: sh tools/ci-retry.sh 300 npm ci
       - if: env.RUN == 'true'
         id: pw
-        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          {
+            echo "version=$(node -p "require('playwright/package.json').version")"
+            echo "os=$ImageOS"
+          } >> "$GITHUB_OUTPUT"
       - if: env.RUN == 'true'
-        uses: actions/cache@v6
+        id: browsers
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium
+          key: playwright-${{ steps.pw.outputs.os }}-${{ steps.pw.outputs.version }}-chromium-shell
       - if: env.RUN == 'true'
         run: sh tools/ci-playwright.sh chromium
+      - if: env.RUN == 'true' && steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers.outputs.cache-primary-key }}
       - if: env.RUN == 'true'
-        uses: owfeed/owfeed/setup@v0.5.5
+        id: owfeedsetup
+        uses: owfeed/owfeed/setup@v0.5.6
       - if: env.RUN == 'true'
-        uses: actions/cache@v6
+        id: owfeed
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/owfeed
-          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}
+          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}-${{ steps.owfeedsetup.outputs.version }}
       - if: env.RUN == 'true'
-        run: FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && owfeed build
+        timeout-minutes: 15
+        run: FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && CI_RETRY_ON=8 sh tools/ci-retry.sh 240 owfeed build
+      - if: env.RUN == 'true' && steps.owfeed.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/owfeed
+          key: ${{ steps.owfeed.outputs.cache-primary-key }}
+      # --clobber: a retry must be allowed to overwrite the file a broken attempt left half-written.
       - if: env.RUN == 'true'
         name: Download the last release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download --repo "$GITHUB_REPOSITORY" --pattern '${{ matrix.old }}' --dir old
+        run: sh tools/ci-retry.sh 120 gh release download --clobber --repo "$GITHUB_REPOSITORY" --pattern '${{ matrix.old }}' --dir old
+      # Up to three builds on a seven-minute clock each (tools/ci-stand.sh).
       - if: env.RUN == 'true'
         name: Wait for the router
-        timeout-minutes: 10
+        timeout-minutes: 25
         run: |
           while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
           cat "$RUNNER_TEMP/owlab-up.log"
           exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
+      - if: env.RUN == 'true' && steps.owlabfetch.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .owlab/cache
+          key: ${{ steps.owlabfetch.outputs.cache-primary-key }}
       - if: env.RUN == 'true'
+        timeout-minutes: 15
         run: node tools/e2e.mjs --router ${{ matrix.router }} --old old/${{ matrix.old }} --new ${{ matrix.new }} --out "$RUNNER_TEMP/e2e" --no-anchor
         shell: bash -O nullglob -e {0}
+      - if: failure() && env.RUN == 'true'
+        run: sh tools/ci-stand-state.sh ${{ matrix.router }} "$RUNNER_TEMP/e2e/stand.txt"
       - if: always() && env.RUN == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: e2e-${{ matrix.router }}
           path: ${{ runner.temp }}/e2e
           if-no-files-found: ignore
-      - if: always() && env.RUN == 'true'
-        run: owlab down || true
 
   # tools/anchor-check.mjs on a router of its own, beside e2e rather than after its crawl: a poll tick
   # growing and shrinking Status > Overview above a parked reader, in all three engines. The same
-  # 9999.0.0 build, installed fresh; the gate and the background router are e2e's.
+  # 9999.0.0 build, installed fresh; the gate, the background router and the caches are e2e's.
   anchor:
     name: Scroll anchoring on ${{ matrix.router }}
-    timeout-minutes: 40
-    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -189,16 +267,29 @@ jobs:
             new: dist/all/luci-theme-footstrap_[0-9]*_all.ipk
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Does the change reach the package
         env:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.before) || '' }}
-        run: echo "RUN=$(sh tools/ci-package-changed.sh "$BASE")" | tee -a "$GITHUB_ENV"
+        # Anything but a plain `false` runs the checks: a gate that broke must not skip them green.
+        run: |
+          run=$(sh tools/ci-package-changed.sh "$BASE") || run=true
+          [ "$run" = false ] || run=true
+          echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
-        uses: owfeed/owlab/setup@v0.6.6
+        id: owlab
+        uses: owfeed/owlab/setup@v0.6.7
+      - if: env.RUN == 'true'
+        id: owlabfetch
+        uses: actions/cache/restore@v6
+        with:
+          path: .owlab/cache
+          key: owlab-fetch-${{ matrix.router }}-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}
       - if: env.RUN == 'true'
         name: Start the router in the background
         run: |
-          (owlab up ${{ matrix.router }}; echo $? > "$RUNNER_TEMP/owlab-up.tmp" && mv "$RUNNER_TEMP/owlab-up.tmp" "$RUNNER_TEMP/owlab-up.rc") \
+          (sh tools/ci-stand.sh ${{ matrix.router }}; echo $? > "$RUNNER_TEMP/owlab-up.tmp" && mv "$RUNNER_TEMP/owlab-up.tmp" "$RUNNER_TEMP/owlab-up.rc") \
             > "$RUNNER_TEMP/owlab-up.log" 2>&1 < /dev/null &
       - if: env.RUN == 'true'
         uses: actions/setup-node@v7
@@ -206,106 +297,256 @@ jobs:
           node-version: '22'
           cache: npm
       - if: env.RUN == 'true'
-        run: npm ci
+        run: sh tools/ci-retry.sh 300 npm ci
       - if: env.RUN == 'true'
         id: pw
         run: |
-          echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
-          echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$(node -p "require('playwright/package.json').version")"
+            echo "image=$ImageOS-$ImageVersion"
+            echo "os=$ImageOS"
+          } >> "$GITHUB_OUTPUT"
       - if: env.RUN == 'true'
-        uses: actions/cache@v6
+        id: browsers
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-firefox-webkit
-      # WebKit's apt libraries; keyed by the runner image, whose own packages they were resolved against
+          key: playwright-${{ steps.pw.outputs.os }}-${{ steps.pw.outputs.version }}-chromium-shell-firefox-webkit
+      # WebKit's apt libraries; keyed by the runner image, whose own packages they were resolved
+      # against. Only an exact hit is installed as it is (PW_DEB_EXACT); an older image's set seeds apt.
       - if: env.RUN == 'true'
-        uses: actions/cache@v6
+        id: debs
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/playwright-debs
           key: playwright-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}-webkit
+          restore-keys: playwright-debs-${{ steps.pw.outputs.os }}-
       - if: env.RUN == 'true'
+        env:
+          PW_DEB_EXACT: ${{ steps.debs.outputs.cache-hit }}
         run: PW_DEB_CACHE="$HOME/.cache/playwright-debs" sh tools/ci-playwright.sh chromium firefox webkit
+      - if: env.RUN == 'true' && steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers.outputs.cache-primary-key }}
+      - if: env.RUN == 'true' && steps.debs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/playwright-debs
+          key: ${{ steps.debs.outputs.cache-primary-key }}
       - if: env.RUN == 'true'
-        uses: owfeed/owfeed/setup@v0.5.5
+        id: owfeedsetup
+        uses: owfeed/owfeed/setup@v0.5.6
       - if: env.RUN == 'true'
-        uses: actions/cache@v6
+        id: owfeed
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/owfeed
-          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}
+          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}-${{ steps.owfeedsetup.outputs.version }}
       - if: env.RUN == 'true'
-        run: FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && owfeed build
+        timeout-minutes: 15
+        run: FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && CI_RETRY_ON=8 sh tools/ci-retry.sh 240 owfeed build
+      - if: env.RUN == 'true' && steps.owfeed.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/owfeed
+          key: ${{ steps.owfeed.outputs.cache-primary-key }}
+      # Up to three builds on a seven-minute clock each (tools/ci-stand.sh).
       - if: env.RUN == 'true'
         name: Wait for the router
-        timeout-minutes: 10
+        timeout-minutes: 25
         run: |
           while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
           cat "$RUNNER_TEMP/owlab-up.log"
           exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
+      - if: env.RUN == 'true' && steps.owlabfetch.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .owlab/cache
+          key: ${{ steps.owlabfetch.outputs.cache-primary-key }}
       - if: env.RUN == 'true'
-        run: owlab install ${{ matrix.router }} ${{ matrix.new }}
+        timeout-minutes: 5
+        run: sh tools/ci-install.sh ${{ matrix.router }} ${{ matrix.new }}
+      # bash on GitHub is `-eo pipefail`, so rc is node's and not tee's. `owlab down` before
+      # ci-stand.sh: `owlab up` keeps a running container, hung or not.
       - if: env.RUN == 'true'
+        name: Measure scroll anchoring
+        timeout-minutes: 35
+        shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/anchor"
-          node tools/anchor-check.mjs --router ${{ matrix.router }} 2>&1 | tee "$RUNNER_TEMP/anchor/anchor-check.txt"
-        shell: bash
+          for try in 1 2; do
+            rc=0
+            node tools/anchor-check.mjs --router ${{ matrix.router }} 2>&1 | tee -a "$RUNNER_TEMP/anchor/anchor-check.txt" || rc=$?
+            # 3: the stand stopped answering before the check's first measurement, or in its
+            # re-measure whatever the first one's reason; 2: the router was not running, or had no
+            # lease. Nothing was judged either way: once more, on a fresh router. Any other exit,
+            # and a second 2 or 3, is the verdict.
+            if { [ "$rc" -ne 3 ] && [ "$rc" -ne 2 ]; } || [ "$try" -eq 2 ]; then
+              # A first 3 left anchor-check's infrastructure title in the job: any other failure
+              # here names itself too, or rerun-infra.yml would read a crash as an outage.
+              if [ "$try" -eq 2 ] && [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then
+                echo "::error title=Scroll anchoring on ${{ matrix.router }}::anchor-check exited $rc on the fresh router"
+              fi
+              exit "$rc"
+            fi
+            echo "::warning title=Scroll anchoring on ${{ matrix.router }}::anchor-check exited $rc, which judged nothing; measuring once more on a fresh router"
+            sh tools/ci-stand-state.sh ${{ matrix.router }} "$RUNNER_TEMP/anchor/stand-try$try.txt"
+            timeout -k 10 120 owlab down ${{ matrix.router }} || true
+            sh tools/ci-stand.sh ${{ matrix.router }}
+            sh tools/ci-install.sh ${{ matrix.router }} ${{ matrix.new }}
+          done
+      - if: failure() && env.RUN == 'true'
+        run: sh tools/ci-stand-state.sh ${{ matrix.router }} "$RUNNER_TEMP/anchor/stand.txt"
       - if: always() && env.RUN == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: anchor-${{ matrix.router }}
           path: ${{ runner.temp }}/anchor
           if-no-files-found: ignore
-      - if: always() && env.RUN == 'true'
-        run: owlab down || true
 
   # Builds a real router's `fs-*.js` and `luci.js` into a static site for Pages. `--base` matches the
-  # path `pages.yml` serves it under.
+  # path `pages.yml` serves it under. The gate, the router and its caches are e2e's; the install is
+  # anchor's, with the theme made active.
   playground:
     name: Record and verify the playground
-    timeout-minutes: 20
+    timeout-minutes: 35
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    # Main too: the tag must not be the first run of tools/playground/* or of verify.mjs's SPA-nav
+    # check, which no other job makes. Not a required check. A tag and a dispatch always record.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
     steps:
+      - if: github.event_name == 'workflow_dispatch' && inputs.publish-pages && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "::error::publish-pages: the github-pages environment deploys only main or a v* tag, not $GITHUB_REF"
+          exit 1
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+        with:
+          persist-credentials: false
+      - name: Does the change reach the package
+        env:
+          BASE: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.before) || '' }}
+        # Anything but a plain `false` runs the checks: a gate that broke must not skip them green.
+        run: |
+          run=$(sh tools/ci-package-changed.sh "$BASE") || run=true
+          [ "$run" = false ] || run=true
+          echo "RUN=$run" | tee -a "$GITHUB_ENV"
+      - if: env.RUN == 'true'
+        id: owlab
+        uses: owfeed/owlab/setup@v0.6.7
+      - if: env.RUN == 'true'
+        id: owlabfetch
+        uses: actions/cache/restore@v6
+        with:
+          path: .owlab/cache
+          key: owlab-fetch-owrt2512-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}
+      - if: env.RUN == 'true'
+        name: Start the router in the background
+        run: |
+          (sh tools/ci-stand.sh owrt2512; echo $? > "$RUNNER_TEMP/owlab-up.tmp" && mv "$RUNNER_TEMP/owlab-up.tmp" "$RUNNER_TEMP/owlab-up.rc") \
+            > "$RUNNER_TEMP/owlab-up.log" 2>&1 < /dev/null &
+      - if: env.RUN == 'true'
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
-      - run: sh tools/ci-playwright.sh
-      - uses: actions/download-artifact@v8
+      - if: env.RUN == 'true'
+        run: sh tools/ci-retry.sh 300 npm ci
+      - if: env.RUN == 'true'
+        id: pw
+        run: |
+          {
+            echo "version=$(node -p "require('playwright/package.json').version")"
+            echo "os=$ImageOS"
+          } >> "$GITHUB_OUTPUT"
+      - if: env.RUN == 'true'
+        id: browsers
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.pw.outputs.os }}-${{ steps.pw.outputs.version }}-chromium-shell
+      - if: env.RUN == 'true'
+        run: sh tools/ci-playwright.sh
+      - if: env.RUN == 'true' && steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers.outputs.cache-primary-key }}
+      - if: env.RUN == 'true'
+        uses: actions/download-artifact@v8
         with:
           name: owfeed-packages
           path: dist/
-      - uses: owfeed/owlab/setup@v0.6.6
-      - run: owlab up owrt2512
-      - run: owlab install owrt2512 dist/noarch/luci-theme-footstrap-*.apk
+      # Up to three builds on a seven-minute clock each (tools/ci-stand.sh).
+      - if: env.RUN == 'true'
+        name: Wait for the router
+        timeout-minutes: 25
+        run: |
+          while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
+          cat "$RUNNER_TEMP/owlab-up.log"
+          exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
+      - if: env.RUN == 'true' && steps.owlabfetch.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .owlab/cache
+          key: ${{ steps.owlabfetch.outputs.cache-primary-key }}
+      - if: env.RUN == 'true'
+        timeout-minutes: 5
+        run: sh tools/ci-install.sh owrt2512 dist/noarch/luci-theme-footstrap-[0-9]*.apk --activate
       # Under $RUNNER_TEMP: the recording cannot outlive the install it describes.
-      - name: Record, build and verify
+      - if: env.RUN == 'true'
+        name: Record, build and verify
         run: |
           set -eu
           PG="$RUNNER_TEMP/playground"
-          node tools/playground/capture.mjs --recording "$PG/recording"
+          # 75: the stand stopped answering (capture.mjs). A fresh router and one more recording;
+          # any other exit is the recording's or the theme's and fails here.
+          rc=0; node tools/playground/capture.mjs --recording "$PG/recording" || rc=$?
+          if [ "$rc" -eq 75 ]; then
+            echo "::warning title=Playground::the stand stopped answering; recording once more on a fresh router"
+            sh tools/ci-stand-state.sh owrt2512 "$RUNNER_TEMP/playground-stand/stand-try1.txt"
+            rm -rf "$PG/recording"
+            timeout -k 10 120 owlab down owrt2512 || true
+            sh tools/ci-stand.sh owrt2512
+            sh tools/ci-install.sh owrt2512 dist/noarch/luci-theme-footstrap-[0-9]*.apk --activate
+            rc=0; node tools/playground/capture.mjs --recording "$PG/recording" || rc=$?
+            # Two routers that stopped answering recorded nothing to judge: the title
+            # rerun-infra.yml re-runs a run by.
+            [ "$rc" -ne 75 ] || echo "::error title=Upstream outage (safe to rerun)::playground: the stand stopped answering on two routers"
+          fi
+          [ "$rc" -eq 0 ] || exit "$rc"
           node tools/playground/build.mjs --recording "$PG/recording" --out "$PG/out" \
             --base "/${GITHUB_REPOSITORY#*/}/playground"
           node tools/playground/verify.mjs --out "$PG/out" --base "/${GITHUB_REPOSITORY#*/}/playground"
-      - if: always()
-        run: owlab down || true
+      - if: failure() && env.RUN == 'true'
+        run: sh tools/ci-stand-state.sh owrt2512 "$RUNNER_TEMP/playground-stand/stand.txt"
+      # The router's state in an artifact of its own: `playground` below is the tarball alone.
+      - if: always() && env.RUN == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: playground-stand
+          path: ${{ runner.temp }}/playground-stand
+          if-no-files-found: ignore
       # Only the built tarball: the raw recording carries pre-scrub session tokens.
-      - uses: actions/upload-artifact@v7
+      - if: env.RUN == 'true'
+        uses: actions/upload-artifact@v7
         with:
           name: playground
           path: ${{ runner.temp }}/playground/playground.tar.gz
           if-no-files-found: error
 
   # The only job that holds a key; `needs` keeps a tag from publishing a package that failed e2e.
+  # A push of the tag only: a dispatch on a tag's ref would sign every package again and replace
+  # each asset of the published release.
   release:
     name: Sign and publish
     needs: [build, e2e, anchor, playground]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.5
+    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.6
     secrets:
       sign-key: ${{ secrets.OWFEED_AUTHOR_KEY }}
       usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}
@@ -314,33 +555,17 @@ jobs:
       # `runner`, and naming it fails the whole run at startup with no log.
       pre-release: sh tools/stage-release.sh
       sign-also: install.sh
+      # A demo site, never router payload: attached unsigned while the release is still a draft.
+      extra-artifact: playground
       notes-file: release-notes.md
       verify-with: release.pub
-
-  # playground.tar.gz is a demo site, never router payload, so it is attached here rather than
-  # signed with dist/*.
-  playground-asset:
-    name: Attach the playground to the release
-    needs: [release, playground]
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: playground
-          path: pg/
-      - env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" pg/playground.tar.gz --clobber --repo "$GITHUB_REPOSITORY"
+      runs-on: ubuntu-24.04
 
   # Called rather than triggered: `on: release` never fires for a release created with GITHUB_TOKEN.
   pages:
     name: Refresh the Pages mirror
-    needs: playground-asset
-    if: startsWith(github.ref, 'refs/tags/v')
+    # The release carries the playground by the time it is published.
+    needs: release
     uses: ./.github/workflows/pages.yml
     permissions:
       contents: read
