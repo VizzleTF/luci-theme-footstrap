@@ -420,16 +420,19 @@ const WORKERS = 8;
 const sessions = (browser, viewport) => Promise.all(Array.from({ length: WORKERS }, () => session(browser, viewport)));
 const closeAll = (list) => Promise.all(list.map((s) => s.ctx.close()));
 
-/* Every pass is timed: the log says where a slow run spent it. Each session takes the next item. */
-async function pass(name, items, list, fn) {
+/* Every pass is timed: the log says where a slow run spent it. Each session takes the next item;
+ * an item in `alone` is read after the rest, with nothing else loading. */
+async function pass(name, items, list, fn, alone = new Set()) {
 	const t0 = Date.now(), out = {};
+	const shared = items.filter((x) => !alone.has(x.path || x));
 	let next = 0;
 	await Promise.all(list.map(async (s) => {
-		while (next < items.length) {
-			const x = items[next++];
+		while (next < shared.length) {
+			const x = shared[next++];
 			out[x.path || x] = await fn(s, x);
 		}
 	}));
+	for (const x of items.filter((x) => alone.has(x.path || x))) out[x.path || x] = await fn(list[0], x);
 	console.log(`  ${name}: ${items.length} in ${Math.round((Date.now() - t0) / 1000)} s`);
 	return out;
 }
@@ -457,8 +460,10 @@ async function crawl(browser, into) {
 	/* The process_list race (below) empties the reference too, and an empty reference vouches for an
 	 * empty footstrap view (3 runs in 5 on 24.10): a view that asked for the process list is read
 	 * once more alone, and the fuller reading kept. Its errors and requests join the first's, so the
-	 * second reading takes back nothing the first vouched for. */
-	for (const p of paths.filter((x) => bs[x].requested.some((k) => k.includes('"getProcessList"')))) {
+	 * second reading takes back nothing the first vouched for. Footstrap's passes read such a view
+	 * alone from the start: among the phone pass's neighbours on 24.10 it came out empty 5 runs in 5. */
+	const lone = new Set(paths.filter((x) => bs[x].requested.some((k) => k.includes('"getProcessList"'))));
+	for (const p of lone) {
 		const r = await open(refs[0].page, refs[0].seen, p, { shotDir: dir('bootstrap'), span: LONG + 1000, reference: true });
 		console.log(`  again, alone: bootstrap ${p}: ${bs[p].text} -> ${r.text} characters`);
 		if (r.text > bs[p].text) bs[p] = { ...r, watched: Math.max(bs[p].watched, r.watched), rendered: bs[p].rendered || r.rendered,
@@ -468,7 +473,7 @@ async function crawl(browser, into) {
 	setTheme('/luci-static/footstrap');
 
 	const desks = await sessions(browser, DESK);
-	const desktop = await pass('desktop', paths, desks, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'desktop'), span: LONG, menu: true }));
+	const desktop = await pass('desktop', paths, desks, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'desktop'), span: LONG, menu: true }), lone);
 	into.footstrap = { desktop };
 	await closeAll(desks.slice(2));
 	/* two pages, each taking half the entries one after another: each click leaves from the view the
@@ -488,7 +493,7 @@ async function crawl(browser, into) {
 	await closeAll(desks.slice(0, 2));
 
 	const phones = await sessions(browser, PHONE);
-	const phone = into.footstrap.phone = await pass('phone', paths, phones, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'phone'), span: SHORT, menu: true }));
+	const phone = into.footstrap.phone = await pass('phone', paths, phones, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'phone'), span: SHORT, menu: true }), lone);
 	await closeAll(phones);
 
 	/* LuCI's process_list (luci/sys.uc, 24.10 and 25.12) answers an empty list when another rpcd

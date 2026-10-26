@@ -73,7 +73,9 @@ A page fails for what footstrap adds over bootstrap on the same page:
   too, and an empty reference passes an empty footstrap view (3 runs in 5 on 24.10). So every
   reference view whose requests include `getProcessList` is read once more alone after the
   bootstrap pass, and the fuller reading is kept, with the errors and requests of both: the second
-  reading takes back nothing the first vouched for. The log prints it as `again, alone: bootstrap`;
+  reading takes back nothing the first vouched for. The log prints it as `again, alone: bootstrap`.
+  The desktop and phone passes read each such view after the rest of the pass, alone from the
+  start: among the phone pass's neighbours on 24.10 it came out empty in 5 runs out of 5;
 - a broken footstrap shell, checked at 1280 and at 390 px. The stylesheet (`link[data-fs-shell]`)
   holds fewer than 500 rules (the shipped sheet holds about 1000). `--primary-color-high` does not
   resolve on `:root`. The menu column (`nav[data-fs-chrome]`) is not visible with a box of its own.
