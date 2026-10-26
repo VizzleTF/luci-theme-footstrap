@@ -240,8 +240,8 @@ async function scrollThrough(page, rolling) {
  * a reader a change moved (the correction-off cell) is no longer below the leases. The scrolling
  * one is read from the moment the reader let go: a container fs-fit.js floored keeps its height
  * while the reader scrolls, and gives it up once they stop, above them. */
-async function phase(name, browser, cells) {
-	const pages = await Promise.all(cells.map((c) => open(browser, c.width, c.cell)));
+async function phase(name, browsers, cells) {
+	const pages = await Promise.all(cells.map((c) => open(browsers[c.engine], c.width, c.cell)));
 	const repark = () => Promise.all(pages.map(async (p, i) => { p.parked = p.parked && await park(p.page, cells[i].width); }));
 	for (const [ kind, change ] of [ [ 'grow', grow ], [ 'shrink', shrink ] ]) {
 		if (kind !== 'grow') await repark();
@@ -268,7 +268,7 @@ async function phase(name, browser, cells) {
 	console.log(`  ${name}: ${cells.length} pages`);
 }
 
-const fails = [];
+let fails = [];
 /* how far the page changed above the reader, in the direction of the change: positive when it
  * measured something */
 const change = (x, kind) => (kind === 'grow' ? x.above : -x.above);
@@ -283,54 +283,77 @@ const valid = (x, kind, where) => {
 };
 
 const engines = opt.engines.split(','), widths = opt.widths.split(',').map(Number);
-const cells = [];
-for (const e of engines) for (const w of widths) for (const cell of [ 'fs', 'nn', 'nnOff', 'bs' ]) cells.push({ engine: e, width: w, cell });
+let cells;
 const t0 = Date.now();
 if (!firstMac) { console.error(`${stand.id}: ${LEASES} has no lease to find the section by`); process.exit(2); }
-try {
-	for (const theme of [ 'footstrap', 'bootstrap' ]) {
-		setTheme(theme);
-		for (const e of engines) {
-			const browser = await playwright[e].launch();
-			try { await phase(`${theme} ${e}`, browser, cells.filter((c) => c.engine === e && (c.cell === 'bs') === (theme === 'bootstrap'))); }
-			finally { await browser.close(); }
+
+/* One measurement of every cell. Footstrap runs one engine at a time, six pages; bootstrap's two
+ * cells per engine run as one phase across the engines, the same six pages' load. */
+async function measure() {
+	cells = [];
+	for (const e of engines) for (const w of widths) for (const cell of [ 'fs', 'nn', 'nnOff', 'bs' ]) cells.push({ engine: e, width: w, cell });
+	try {
+		for (const theme of [ 'footstrap', 'bootstrap' ]) {
+			setTheme(theme);
+			for (const group of theme === 'footstrap' ? engines.map((e) => [ e ]) : [ engines ]) {
+				const browsers = {};
+				try {
+					for (const e of group) browsers[e] = await playwright[e].launch();
+					await phase(`${theme} ${group.join('+')}`, browsers,
+						cells.filter((c) => group.includes(c.engine) && (c.cell === 'bs') === (theme === 'bootstrap')));
+				} finally { await Promise.all(Object.values(browsers).map((b) => b.close())); }
+			}
 		}
+	} finally {
+		setTheme('footstrap');
+		shrink();
 	}
-} finally {
-	setTheme('footstrap');
-	shrink();
 }
 
-for (const e of engines) for (const w of widths) for (const kind of [ 'grow', 'shrink', 'scroll' ]) {
-	const k = `${e}@${w} ${kind}`;
-	const c = Object.fromEntries(cells.filter((x) => x.engine === e && x.width === w).map((x) => [ x.cell, x.res && x.res[kind] ]));
-	const show = (x) => (x ? `${x.end}/${x.max}/${x.off}f/${x.painted}p of ${x.above}px` : '-');
-	console.log(`${k}: reader moved (end/max/frames off/painted off of the change) footstrap ${show(c.fs)}, bootstrap ${show(c.bs)}; `
-		+ `no native: footstrap ${show(c.nn)}, correction off ${show(c.nnOff)}`);
-	/* bootstrap floors nothing, so nothing is left to change once its reader lets go: no reference there */
-	const ref = kind !== 'scroll';
-	if (![ 'fs', 'nn', 'nnOff', ...(ref ? [ 'bs' ] : []) ].map((n) => valid(c[n], kind, `${k} ${n}`)).every(Boolean)) continue;
-	/* the three footstrap cells read one page; a change that differs means the emulation changed it */
-	if ([ c.nn, c.nnOff ].some((x) => Math.abs(x.above - c.fs.above) > ABOVE_TOL)) {
-		fails.push(`${k}: the no-native cells changed by ${c.nn.above}/${c.nnOff.above}px above the reader where footstrap changed by ${c.fs.above}px — they measured another page`);
-		continue;
+function judgeAll() {
+	fails = [];
+	for (const e of engines) for (const w of widths) for (const kind of [ 'grow', 'shrink', 'scroll' ]) {
+		const k = `${e}@${w} ${kind}`;
+		const c = Object.fromEntries(cells.filter((x) => x.engine === e && x.width === w).map((x) => [ x.cell, x.res && x.res[kind] ]));
+		const show = (x) => (x ? `${x.end}/${x.max}/${x.off}f/${x.painted}p of ${x.above}px` : '-');
+		console.log(`${k}: reader moved (end/max/frames off/painted off of the change) footstrap ${show(c.fs)}, bootstrap ${show(c.bs)}; `
+			+ `no native: footstrap ${show(c.nn)}, correction off ${show(c.nnOff)}`);
+		/* bootstrap floors nothing, so nothing is left to change once its reader lets go: no reference there */
+		const ref = kind !== 'scroll';
+		if (![ 'fs', 'nn', 'nnOff', ...(ref ? [ 'bs' ] : []) ].map((n) => valid(c[n], kind, `${k} ${n}`)).every(Boolean)) continue;
+		/* the three footstrap cells read one page; a change that differs means the emulation changed it */
+		if ([ c.nn, c.nnOff ].some((x) => Math.abs(x.above - c.fs.above) > ABOVE_TOL)) {
+			fails.push(`${k}: the no-native cells changed by ${c.nn.above}/${c.nnOff.above}px above the reader where footstrap changed by ${c.fs.above}px — they measured another page`);
+			continue;
+		}
+		const bs = ref ? c.bs : { end: 0, off: 0, painted: 0 };
+		if (Math.abs(c.fs.end) > Math.abs(bs.end) + TOL)
+			fails.push(`${k}: footstrap left the reader ${c.fs.end}px off where bootstrap left ${bs.end}px`);
+		/* an engine that anchors moves the offset inside the layout, so no frame shows the reader off */
+		else if (c.fs.off > bs.off || c.fs.painted > bs.painted)
+			fails.push(`${k}: footstrap showed the reader off place in ${c.fs.off} frames, ${c.fs.painted} painted (up to ${c.fs.max}px), bootstrap in ${bs.off}, ${bs.painted} painted`);
+		if (Math.abs(c.nnOff.end) < change(c.nnOff, kind) / 2)
+			fails.push(`${k}: with the correction off the reader moved only ${c.nnOff.end}px of ${c.nnOff.above} — the no-native cell proves nothing`);
+		else if (c.nnOff.painted < 1)
+			fails.push(`${k}: with the correction off no painted frame showed the reader off — the painted count proves nothing`);
+		else if (Math.abs(c.nn.end) > TOL)
+			fails.push(`${k}: without native anchoring footstrap left the reader ${c.nn.end}px off (correction off: ${c.nnOff.end}px)`);
+		/* the rAF sampler reads the frame the correction is written in, before the write; what counts is
+		 * whether a painted frame showed it */
+		else if (c.nn.painted > 0)
+			fails.push(`${k}: without native anchoring footstrap painted the reader off place in ${c.nn.painted} frames (up to ${c.nn.max}px)`);
 	}
-	const bs = ref ? c.bs : { end: 0, off: 0, painted: 0 };
-	if (Math.abs(c.fs.end) > Math.abs(bs.end) + TOL)
-		fails.push(`${k}: footstrap left the reader ${c.fs.end}px off where bootstrap left ${bs.end}px`);
-	/* an engine that anchors moves the offset inside the layout, so no frame shows the reader off */
-	else if (c.fs.off > bs.off || c.fs.painted > bs.painted)
-		fails.push(`${k}: footstrap showed the reader off place in ${c.fs.off} frames, ${c.fs.painted} painted (up to ${c.fs.max}px), bootstrap in ${bs.off}, ${bs.painted} painted`);
-	if (Math.abs(c.nnOff.end) < change(c.nnOff, kind) / 2)
-		fails.push(`${k}: with the correction off the reader moved only ${c.nnOff.end}px of ${c.nnOff.above} — the no-native cell proves nothing`);
-	else if (c.nnOff.painted < 1)
-		fails.push(`${k}: with the correction off no painted frame showed the reader off — the painted count proves nothing`);
-	else if (Math.abs(c.nn.end) > TOL)
-		fails.push(`${k}: without native anchoring footstrap left the reader ${c.nn.end}px off (correction off: ${c.nnOff.end}px)`);
-	/* the rAF sampler reads the frame the correction is written in, before the write; what counts is
-	 * whether a painted frame showed it */
-	else if (c.nn.painted > 0)
-		fails.push(`${k}: without native anchoring footstrap painted the reader off place in ${c.nn.painted} frames (up to ${c.nn.max}px)`);
+}
+
+/* A cell that measured nothing is a run that did not happen, not a finding: the whole check runs
+ * once more then, and only then. A failure that measured something is never run again. */
+await measure();
+judgeAll();
+if (fails.length && fails.every((f) => / — measured nothing$/.test(f))) {
+	for (const f of fails) console.log('MEASURED NOTHING ' + f);
+	console.log(`anchor-check ${stand.id}: measured nothing in ${fails.length} cell(s), measuring again`);
+	await measure();
+	judgeAll();
 }
 for (const f of fails) console.log('FAIL ' + f);
 console.log(`anchor-check ${stand.id}: ${fails.length ? `${fails.length} failure(s)` : 'PASS'} in ${Math.round((Date.now() - t0) / 1000)} s`);
