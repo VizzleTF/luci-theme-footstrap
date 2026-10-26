@@ -22,7 +22,7 @@ apps but not this theme, the way an admin lives it:
    map, logout excepted. First under bootstrap, the reference, at 1280 px; then under footstrap by
    a full load at 1280 px and at 390 px, and every entry of footstrap's menu (each top-level entry
    and each entry under one, from the router's own menu tree) by a click on its link. The full-load
-   passes read four pages at a time, each in a logged-in context of its own, the same count under
+   passes read eight pages at a time, each in a logged-in context of its own, the same count under
    both themes; the click pass is two pages, each taking half the entries one after another. Then
    `tools/anchor-check.mjs` (below) runs against the installed build; `--no-anchor` leaves it out,
    which is what CI does, running it as a job of its own (`anchor`) on a router of its own.
@@ -145,8 +145,8 @@ and the same on `owrt2410` with `luci-theme-footstrap_*_all.ipk` and
   running. The output and screenshots land in `--out`, by default `../tmp/e2e-<router>`.
 - **Done means both**: 25.12/apk and 24.10/opkg. Say which one a run covered.
 - CI runs the crawl (`e2e`) and the anchoring check (`anchor`) as two jobs per router, side by side.
-  The crawl takes about 8 minutes (bootstrap 250 s, desktop 155 s, click about 30 s, phone 32 s; the
-  log prints each pass's time), the anchoring check about 5; a job's setup adds about 2, the router
+  The crawl takes about 4.5 minutes (bootstrap 130 s, desktop 80 s, click about 30 s, phone 18 s;
+  the log prints each pass's time), the anchoring check about 5, so the anchoring job ends the run; a job's setup adds about 2, the router
   building in the background while the browsers and the package are fetched and packed. A change
   that touches documentation alone skips both (`tools/ci-package-changed.sh`).
 - The anchoring check runs on its own against any running router with footstrap active, an

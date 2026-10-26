@@ -335,9 +335,9 @@ async function session(browser, viewport) {
 }
 
 /* Pages read at once, each in a logged-in context of its own. Most of a page's time is the span it
- * is watched, so four cut a pass about fourfold; the reference and footstrap run at the same count,
+ * is watched, so more pages at once cut a pass; the reference and footstrap run at the same count,
  * so the router carries the same load under both. */
-const WORKERS = 4;
+const WORKERS = 8;
 const sessions = (browser, viewport) => Promise.all(Array.from({ length: WORKERS }, () => session(browser, viewport)));
 const closeAll = (list) => Promise.all(list.map((s) => s.ctx.close()));
 
