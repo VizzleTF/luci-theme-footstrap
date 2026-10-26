@@ -48,7 +48,11 @@ A page fails for what footstrap adds over bootstrap on the same page:
   renders under bootstrap, or whose visible text is less than half of bootstrap's: the characters
   of every text node in `#view` (else `#maincontent`) whose element is rendered, outside a
   `<select>`, whose options a native select under bootstrap lists and footstrap's styled one does
-  not. On a clean run footstrap's share is 0.62 at its lowest (390 px, `status/wireguard`);
+  not. On a clean run footstrap's share is 0.62 at its lowest (390 px, `status/wireguard`). A view
+  short of that is read once more on its own after the pass, with nothing else loading, and judged
+  on that reading: LuCI's `process_list` (Status → Processes) answers an empty list when another
+  rpcd child exits while it reads `top`'s output, as a neighbour page's `file.exec` does, on 24.10
+  and 25.12 alike (48–74 empty answers in ~190 beside a `file exec` loop, none alone);
 - footstrap's stylesheet (`link[data-fs-shell]`) holding fewer than 500 rules (the shipped sheet
   holds about 1000), `--primary-color-high` not resolving on `:root`, the menu column
   (`nav[data-fs-chrome]`) not visible with a box of its own, or the menu's first entry failing

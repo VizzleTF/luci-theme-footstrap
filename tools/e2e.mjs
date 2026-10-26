@@ -390,6 +390,22 @@ async function crawl(browser) {
 	const phone = await pass('phone', paths, phones, (s, p) => open(s.page, s.seen, p, { shotDir: dir('footstrap', 'phone'), span: SHORT, menu: true }));
 	await closeAll(phones);
 
+	/* LuCI's process_list (luci/sys.uc, 24.10 and 25.12) answers an empty list when another rpcd
+	 * child exits while it reads top's output, as a neighbour's file.exec does: a view short of
+	 * bootstrap's text is read once more on its own, with nothing else loading. A theme that hides
+	 * a view hides it again. */
+	for (const [ how, results, viewport, span ] of [ [ 'desktop', desktop, DESK, LONG ], [ 'phone', phone, PHONE, SHORT ] ]) {
+		const thin = paths.filter((p) => bs[p] && results[p].text < bs[p].text / 2);
+		if (!thin.length) continue;
+		const s = await session(browser, viewport);
+		for (const p of thin) {
+			const before = results[p].text;
+			results[p] = await open(s.page, s.seen, p, { shotDir: dir('footstrap', how), span, menu: true });
+			console.log(`  again, alone: ${how} ${p}: ${before} -> ${results[p].text} characters (bootstrap ${bs[p].text})`);
+		}
+		await s.ctx.close();
+	}
+
 	const pages = [];
 	for (const p of paths) {
 		pages.push({ path: p, how: 'desktop', problems: judge(desktop[p], bs[p]) });
