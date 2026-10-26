@@ -209,14 +209,22 @@ jobs:
         run: npm ci
       - if: env.RUN == 'true'
         id: pw
-        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
       - if: env.RUN == 'true'
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-firefox-webkit
+      # WebKit's apt libraries; keyed by the runner image, whose own packages they were resolved against
       - if: env.RUN == 'true'
-        run: sh tools/ci-playwright.sh chromium firefox webkit
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/playwright-debs
+          key: playwright-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}-webkit
+      - if: env.RUN == 'true'
+        run: PW_DEB_CACHE="$HOME/.cache/playwright-debs" sh tools/ci-playwright.sh chromium firefox webkit
       - if: env.RUN == 'true'
         uses: owfeed/owfeed/setup@v0.5.5
       - if: env.RUN == 'true'

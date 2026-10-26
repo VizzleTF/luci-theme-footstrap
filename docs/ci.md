@@ -49,11 +49,17 @@ Every job in `build.yml` and `pages.yml` has a `timeout-minutes`. Every Playwrig
 `tools/ci-retry.sh`. apt and the Playwright CDN stall rather than fail, and a stalled step is never
 retried. So each attempt gets its own deadline (300 s, three attempts), and the job timeout is only
 the backstop. Each attempt runs in a session of its own and is killed by process group, because
-`timeout` signals only the child it started and a surviving `apt-get` keeps the lists lock.
+`timeout` signals only the child it started and a surviving `apt-get` keeps the lists lock. A
+slow mirror stays slow, and apt falls back to the next one only on an error. So after a failed
+attempt `ci-retry.sh` drops the first line of `/etc/apt/apt-mirrors.txt`, and the retry asks the
+next mirror.
 
 `tools/ci-playwright.sh` fetches the engines it is given (Chromium by default) from Playwright's
 CDN, launches each, and goes to apt only for the engines whose launch fails. `e2e` and `playground`
-install Chromium; `anchor` installs Chromium, Firefox and WebKit.
+install Chromium; `anchor` installs Chromium, Firefox and WebKit. WebKit does not launch on
+GitHub's image and needs 117 MB of `.deb` from apt. `anchor` keeps them in `actions/cache`
+(`~/.cache/playwright-debs`, keyed by the runner image and Playwright's version) and passes the
+directory as `PW_DEB_CACHE`. apt then downloads only packages that changed since the save.
 
 ## Rules the server holds
 

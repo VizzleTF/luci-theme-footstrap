@@ -36,8 +36,19 @@ done
 [ -n "$missing" ] || { echo "ci-playwright: apt not needed."; exit 0; }
 
 echo "ci-playwright:$missing will not launch on this image — installing their system libraries" >&2
+# WebKit's libraries are 117 MB of .deb, fetched again by every run. $PW_DEB_CACHE (restored by
+# actions/cache) seeds apt's archive dir, so apt downloads only what changed since it was saved.
+DEBS="${PW_DEB_CACHE:-}"
+if [ -n "$DEBS" ] && ls "$DEBS"/*.deb >/dev/null 2>&1; then
+	echo "ci-playwright: seeding apt from $DEBS"
+	sudo -n cp "$DEBS"/*.deb /var/cache/apt/archives/
+fi
 # shellcheck disable=SC2086
 sh tools/ci-retry.sh 300 sudo -n npx playwright install-deps $missing
+if [ -n "$DEBS" ]; then
+	mkdir -p "$DEBS"
+	cp /var/cache/apt/archives/*.deb "$DEBS"/ 2>/dev/null || true
+fi
 
 for engine in $missing; do
 	launches "$engine" || { echo "ci-playwright: $engine still will not launch after installing its libraries" >&2; exit 1; }

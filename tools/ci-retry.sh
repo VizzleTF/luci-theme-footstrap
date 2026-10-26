@@ -58,6 +58,14 @@ clear_apt() {
 	sudo -n rm -f /var/lib/apt/lists/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend \
 		/var/cache/apt/archives/lock 2>/dev/null || true
 	sudo -n dpkg --configure -a >/dev/null 2>&1 || true
+	# A slow mirror is still slow on the next attempt, and apt's mirror method falls back only on an
+	# error, never on speed (azure.archive.ubuntu.com at ~40 kB/s sank three tries of 117 MB). Drop the
+	# first mirror so the retry asks the next one.
+	_m=/etc/apt/apt-mirrors.txt
+	if [ -f "$_m" ] && [ "$(grep -c . "$_m")" -gt 1 ]; then
+		echo "ci-retry: next apt attempt skips mirror $(sed -n 1p "$_m" | cut -f1)" >&2
+		sudo -n sed -i 1d "$_m" 2>/dev/null || true
+	fi
 }
 
 i=1
