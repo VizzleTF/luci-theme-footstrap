@@ -1,0 +1,119 @@
+# Re-runs the failed jobs of a red build.yml run once, when every job that failed says it failed
+# outside the theme: a router that never came up, a download that kept stalling, an upstream that
+# kept refusing, a stand that stopped answering under a check. One other failure (a theme finding,
+# an exit nothing named, a job past its timeout) leaves the run red for a person to read, and so
+# does the second attempt: the same outage twice is no hiccup.
+#
+# It reads the run through the API and never checks out or runs the run's code. GitHub fires
+# workflow_run only from this file's copy on the default branch.
+name: rerun-infra
+
+on:
+  workflow_run:
+    workflows: [Build LuCI theme packages]
+    types: [completed]
+
+permissions:
+  actions: write
+  checks: read
+  contents: read
+
+jobs:
+  rerun:
+    name: Re-run an infrastructure failure
+    if: github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.event.workflow_run.id }}
+          # The allow-list, and the only one. An `::error` with one of these titles vouches that
+          # nothing of the theme was judged where it was printed: the first comes from
+          # tools/ci-retry.sh, tools/e2e.mjs, tools/anchor-check.mjs and build.yml's playground, the
+          # second from tools/ci-stand.sh (as %2C there: a bare comma ends a title).
+          INFRA: |-
+            Upstream outage (safe to rerun)
+            The router did not come up (infrastructure, not the theme)
+        run: |
+          set -eu
+          # gh api on a clock, three tries: one API hiccup must not decide anything here.
+          api() {
+            for i in 1 2 3; do
+              if out=$(timeout 30 gh api "$@" < /dev/null); then
+                [ -z "$out" ] || printf '%s\n' "$out"
+                return 0
+              fi
+              echo "gh api: try $i of 3 failed" >&2
+              [ "$i" -eq 3 ] || sleep $((i * 10))
+            done
+            echo "::error::gh api did not answer; run $RUN is left as it is" >&2
+            return 1
+          }
+
+          # Every job that neither passed nor skipped. A job past its timeout is listed as
+          # cancelled, and no title classifies it.
+          jobs=$(api --paginate "repos/$REPO/actions/runs/$RUN/attempts/1/jobs?per_page=100" --jq '.jobs[]
+            | select(.conclusion != "success" and .conclusion != "skipped")
+            | "\(.id) \(.conclusion) \(.name | gsub("[\r\n]"; " "))"')
+          if [ -z "$jobs" ]; then echo "run $RUN: no failed job listed: left as it is"; exit 0; fi
+
+          while read -r id conclusion name; do
+            case $id in
+              '' | *[!0-9]*) echo "run $RUN: a job id that is not a number: left as it is"; exit 0 ;;
+            esac
+            if [ "$conclusion" != failure ]; then
+              echo "'$name': $conclusion, which no title classifies: run $RUN is left as it is"
+              exit 0
+            fi
+            # Each failure annotation's title. The runner's own "Process completed with exit
+            # code N." goes with every failed step and names nothing; any other untitled one is a
+            # finding.
+            titles=$(api --paginate "repos/$REPO/check-runs/$id/annotations?per_page=100" --jq '.[]
+              | select(.annotation_level == "failure")
+              | if (.title // "") != "" then (.title | gsub("[\r\n]"; " "))
+                elif (.message | test("^Process completed with exit code [0-9]+\\.$")) then empty
+                else "untitled: \(.message | split("\n")[0] | gsub("\r"; " "))" end')
+            if [ -z "$titles" ]; then
+              echo "'$name': failed with no title that names a cause: run $RUN is left as it is"
+              exit 0
+            fi
+            # Untrusted text (a pull request's code printed it): each line is logged behind "- ", so
+            # none starts with the "::" of a workflow command; the runner also splits a line at a bare
+            # CR, so the jq above turns every CR and LF into a space.
+            other=$(printf '%s\n' "$titles" | sort -u | grep -vxF "$INFRA" || true)
+            if [ -n "$other" ]; then
+              echo "'$name': a failure that is not infrastructure: run $RUN is left as it is"
+              printf '%s\n' "$other" | sed 's/^/  - /'
+              exit 0
+            fi
+            echo "'$name': infrastructure only: $(printf '%s\n' "$titles" | sort -u | paste -sd '|' -)"
+          done <<EOF
+          $jobs
+          EOF
+
+          # A person may have re-run it since it ended; asking again would start a third attempt.
+          attempt=$(api "repos/$REPO/actions/runs/$RUN" --jq .run_attempt)
+          if [ "$attempt" != 1 ]; then
+            echo "run $RUN is on attempt $attempt already: left as it is"
+            exit 0
+          fi
+          echo "run $RUN: every failed job failed on infrastructure alone: re-running them once"
+          for i in 1 2 3; do
+            if timeout 30 gh api -X POST "repos/$REPO/actions/runs/$RUN/rerun-failed-jobs" \
+              < /dev/null > /dev/null; then
+              echo "run $RUN: re-run requested"
+              exit 0
+            fi
+            # A request that landed and lost its answer has started attempt 2; a second is refused.
+            case "$(timeout 30 gh api "repos/$REPO/actions/runs/$RUN" --jq .run_attempt < /dev/null || true)" in
+              '' | 1) ;;
+              *) echo "run $RUN: a re-run is under way"; exit 0 ;;
+            esac
+            echo "re-run request: try $i of 3 failed" >&2
+            [ "$i" -eq 3 ] || sleep $((i * 10))
+          done
+          echo "::error::run $RUN: the re-run request failed three times; re-run the failed jobs by hand"
+          exit 1
