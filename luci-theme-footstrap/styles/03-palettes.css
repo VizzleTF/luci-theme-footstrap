@@ -42,6 +42,12 @@
 		--fs-pattern-url: none;
 		--fs-pattern-size: 440px;
 		--fs-pattern-strength: .2;
+		/* glass over a wallpaper (theme/17-glass.css): 100% is the solid default; the axes stamp
+		 * the real value inline together with the attribute that switches the glass on */
+		--fs-card-opacity: 100%;
+		--fs-bar-opacity: 100%;
+		/* the blur as a share of the material's own, 1 = as designed */
+		--fs-blur: 1;
 		/* floor + two cos() terms, not flat chroma. docs/design-system.md "Tint and Accent". */
 		--fs-tint-c: calc((.016 + .012 * max(0, cos((var(--fs-tint-h) - 258) * 1deg))) * var(--fs-tint-strength));
 		/* ---- footstrap — GitHub Primer (DEFAULT), LIGHT ---- */

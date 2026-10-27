@@ -94,11 +94,38 @@ name in three places, each failing quietly if skipped: the PALETTE axis in `fs-a
 `_sd_pal` whitelist and pre-paint switch in `partials/head.ut`, and the label map in
 `fs-appearance.js`.
 
-### Surfaces carry no transparency axis
+### Transparency: cards and the menu over the wallpaper
 
-`--fs-panel`, `--fs-panel2` and `--fs-border` are solid per palette. A translucent surface thins
-the text on it, and contrast against a semi-transparent backdrop is undefined: it depends on
-whatever pixel sits behind. The wallpaper axis is the way to show a picture.
+Card opacity and Menu opacity let the wallpaper show through the cards and through the sidebar or
+bar (issue #87). Material sets how: Flat, Frosted or Acrylic. Both opacities default to 100%, and the
+glass acts only under a wallpaper and below 100%, where `fs-axes.js` and the `head.ut` pre-paint
+stamp `data-glass` and `data-glass-bar`. The rules live in `theme/17-glass.css`.
+
+The palette stays solid, and no paint rule changes. `17-glass.css` re-declares the `--fs-panel`,
+`--fs-panel2`, `--fs-track` and `--fs-border` tokens per subtree. A card takes the translucent panel
+for itself and hands a transparent one to everything inside it. A nested card, a table frame or an
+ifacebox thus adds no second layer of alpha. Inside a card, Flat paints each inset in its own colour
+at the same opacity. Frosted and Acrylic paint a veil of the ink instead and blur the wallpaper under
+each top-level card and the menu, Frosted by 30px and Acrylic by 54px. Blur scales that radius from
+0 to 200%. Floating surfaces take the solid tokens back, because they cover other text:
+modals, open lists, tooltips and the search box. The menu's popups (bar dropdowns, rail flyouts) are
+the menu, so they follow Menu opacity and blur what they cover, Flat included. The export tier follows the
+glass, or an app's tile would sit on a glass card as a solid block.
+
+Contrast on a translucent surface is still undefined: it depends on the pixel behind. So the glass
+is opt-in, Photo dim still darkens the photo under it, and it stays off when the system asks for
+less transparency or more contrast. JS reads those queries, not `@media`: Safari and Firefox do not
+know `prefers-reduced-transparency`, and an unknown query would turn the glass off there. The
+Appearance page's contrast readouts measure the solid palette and hide where the surface itself is
+translucent.
+
+The blur has costs. A blurred card is a stacking context and the containing block of its fixed
+descendants, so the card in use (`:hover`, `:focus-within`) is lifted above its neighbours. Chromium
+blurs nothing behind an element inside a blurred one, so a sticky table cell under Frosted or Acrylic
+relies on a 95% fill instead. For the same reason the bar and the rail blur on a layer under
+themselves (`.fs-sidebar::before`), so their popups can blur the page and still rise over it; the
+expanded sidebar, which scrolls and opens no popup, blurs itself. Flat blurs only what the page scrolls under: the bar and the sticky
+cells, at fixed radii that Blur does not move. An engine without `color-mix()` and the printed page keep the solid theme.
 
 ### Ink is per palette AND per mode
 
@@ -247,17 +274,18 @@ entry exists while the package is installed, whichever theme is active; see
 [architecture.md](architecture.md).
 
 The values live in `fs-axes.js` (`fs-prefs.js` for dark mode, layout, auto-collapse and rail). The
-page groups them in four parts:
+page groups them in four tabs, LuCI's own `ui.tabs`, with the Saving card under them:
 
-- Interface: Layout, Theme, Palette, Density, Content width, Rounding, Submenus.
-- The Colours fold: Tint and its strength, the four colour axes, the four surface axes.
-- The Background fold: Wallpaper, Dim, Pattern and its three axes, File.
-- Saving.
+- Colour scheme: Mode, Palette, Accent.
+- Interface: Layout, Submenus, Density, Content width, Rounding.
+- Background: Tint and its strength, Wallpaper, Pattern and its three axes, File and Dim, then
+  Transparency (Card opacity, Menu opacity, Material, Blur), shown only under a wallpaper.
+- Colours: Good, Warning, Danger and the four surface axes.
 
 | Axis | Values | `localStorage` | `:root` |
 |---|---|---|---|
 | Layout | top (default) / sidebar | `fs-layout` | `data-layout` (always explicit) |
-| Theme | auto / light / dark | `fs-darkmode` | `data-darkmode` + `data-theme` + `data-bs-theme` |
+| Mode | auto / light / dark | `fs-darkmode` | `data-darkmode` + `data-theme` + `data-bs-theme` |
 | Palette | footstrap / hicontrast / bootstrap / 2020 / forum | `fs-palette` | `data-palette` |
 | Density | compact / normal / large | `fs-density` | `data-density` |
 | Wallpaper | off / pattern / file | `fs-wallpaper` | `data-wallpaper` |
@@ -270,6 +298,10 @@ page groups them in four parts:
 | Pattern scale | 40–1600px, default 440 | `fs-pattern-size` | `--fs-pattern-size` |
 | Pattern strength | 0–100%, default 20 | `fs-pattern-strength` | `--fs-pattern-strength` |
 | Pattern colours | theme / original | `fs-pattern-ink` | `data-pattern-ink=original` |
+| Card opacity | 0–100%, default 100 | `fs-card-opacity` | `--fs-card-opacity`; `data-glass` below 100 |
+| Menu opacity | 0–100%, default 100 | `fs-bar-opacity` | `--fs-bar-opacity`; `data-glass-bar` below 100 |
+| Material | flat / frosted (default) / acrylic | `fs-material` | `data-material=flat\|acrylic` |
+| Blur | 0–200%, default 100; Frosted and Acrylic | `fs-blur` | `--fs-blur` |
 | Rounding | 0–20px, default 12 | `fs-radius` | `--fs-radius-base` |
 | Content width | 1280–3840px, default 1280 | `fs-content-width` | `--fs-content-max` |
 | Submenus | keep open / auto-collapse | `fs-menu-autocollapse` | none |
@@ -305,12 +337,11 @@ The uploaded photo (`file`) paints on one element (`.fs-shell`, or `body` before
 `prefers-reduced-transparency` is not honoured here: an opaque scrim would hide the admin's photo
 (#66).
 
-Five more `fs-` keys are not axes:
+Three more `fs-` keys are not axes:
 
 - `fs-rail`: the sidebar collapsed to its icon rail;
 - `fs-menu-open`: the open accordion sections;
-- `fs-recent`: the command palette's history;
-- `fs-ui-colours` and `fs-ui-background`: whether the Appearance page's two folds are open.
+- `fs-recent`: the command palette's history.
 
 None has a router default. So `fs-rail` may delete its key on the off state, where an axis may not.
 

@@ -1477,35 +1477,38 @@ option two</textarea></div>
 </div>
 
 <div class="g-sec">
-	<h2>Appearance — fold, action row, background row (pages/80-appearance.css)</h2>
-	<!-- view/footstrap/appearance.js (fs-appearance.js): foldable() puts a button.fs-ap-fold with an
-	     empty .fs-ap-chev inside the section's h2, `group()` rows are stock .cbi-value, the Saved
-	     look row is .fs-ap-actrow (Save, a .fs-ap-actgap spacer, two resets; twoClick() adds
-	     .fs-ap-armed to the primed one), and Pattern/File are .fs-ap-bgrow of .btn. -->
+	<h2>Appearance — pills, eyebrow, action row, background row (pages/80-appearance.css)</h2>
+	<!-- view/footstrap/appearance.js (fs-appearance.js): the setting cards are panes of one
+	     ui.tabs group (the strip is the stock ul.cbi-tabmenu above), rows are stock .cbi-value, a
+	     short choice is .fs-seg (radios in labels), a sub-group opens with .fs-ap-sub h4, Pattern/File
+	     are .fs-ap-bgrow of .btn, and the Saving card's .fs-ap-actrow is Save, a .fs-ap-actgap spacer
+	     and two resets; twoClick() adds .fs-ap-armed to the primed one. -->
 	<div class="fs-ap">
-		<div class="fs-ap-section">
-			<div class="fs-ap-head"><h2><button type="button" class="fs-ap-fold" aria-expanded="false" aria-controls="g-ap-fold-1">Colours<span class="fs-ap-chev" aria-hidden="true"></span></button></h2></div>
-			<div id="g-ap-fold-1" hidden></div>
-		</div>
-		<div class="fs-ap-section">
-			<div class="fs-ap-head"><h2><button type="button" class="fs-ap-fold" aria-expanded="true" aria-controls="g-ap-fold-2">Background<span class="fs-ap-chev" aria-hidden="true"></span></button></h2></div>
-			<div id="g-ap-fold-2">
-				<div class="cbi-value">
-					<label class="cbi-value-title">Pattern</label>
-					<div class="cbi-value-field">
-						<div class="fs-ap-bgrow"><button class="btn cbi-button" type="button">Choose…</button><button class="btn cbi-button-remove" type="button">Remove</button></div>
-					</div>
-				</div>
-			</div>
-		</div>
-		<div class="fs-ap-section">
-			<div class="fs-ap-head"><h2>Saved look</h2></div>
+		<div class="cbi-section fs-ap-card">
 			<div class="cbi-value">
-				<label class="cbi-value-title">Saved look</label>
+				<label class="cbi-value-title">Wallpaper</label>
 				<div class="cbi-value-field">
-					<div class="fs-ap-actrow"><button class="btn cbi-button cbi-button-save" type="button">Save to router</button><span class="fs-ap-actgap" aria-hidden="true"></span><button class="btn cbi-button" type="button">Reset to router</button><button class="btn cbi-button fs-ap-armed" type="button">Confirm reset</button></div>
+					<div class="fs-seg" role="radiogroup" aria-label="Wallpaper"><label><input type="radio" name="g-ap-seg-1" value=""><span>None</span></label><label><input type="radio" name="g-ap-seg-1" value="pattern" checked><span>Pattern</span></label><label><input type="radio" name="g-ap-seg-1" value="file"><span>File</span></label></div>
 				</div>
 			</div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Pattern</label>
+				<div class="cbi-value-field">
+					<div class="fs-ap-bgrow"><button class="btn cbi-button" type="button">Choose…</button><button class="btn cbi-button-remove" type="button">Remove</button></div>
+				</div>
+			</div>
+			<div class="fs-ap-sub"><h4>Transparency</h4></div>
+			<div class="cbi-value">
+				<label class="cbi-value-title">Material</label>
+				<div class="cbi-value-field">
+					<div class="fs-seg" role="radiogroup" aria-label="Material"><label><input type="radio" name="g-ap-seg-2" value="flat"><span>Flat</span></label><label><input type="radio" name="g-ap-seg-2" value="frosted" checked><span>Frosted</span></label><label><input type="radio" name="g-ap-seg-2" value="acrylic"><span>Acrylic</span></label></div>
+				</div>
+			</div>
+		</div>
+		<div class="cbi-section fs-ap-card">
+			<h3>Saving</h3>
+			<p class="fs-ap-lead">Footstrap theme settings apply at once and are stored permanently in this browser.</p>
+			<div class="fs-ap-actrow"><button class="btn cbi-button cbi-button-save" type="button">Save to router</button><span class="fs-ap-actgap" aria-hidden="true"></span><button class="btn cbi-button" type="button">Reset to router</button><button class="btn cbi-button fs-ap-armed" type="button">Confirm reset</button></div>
 		</div>
 	</div>
 </div>

@@ -113,11 +113,9 @@
 		margin-bottom: var(--fs-card-gap);
 	}
 
-	/* the disclosure chevron, one rule for both hosts: the overview card toggle (a stock element, keyed by
-	 * attribute) and the Appearance fold (ours, keyed by class), so the two cannot drift.
+	/* the disclosure chevron of the overview card toggle (a stock element, keyed by attribute).
 	 * pages/20-overview.css sizes the pill around it. */
-	.cbi-title .label[data-indicator="poll-status"]::after,
-	.fs-ap-chev::after {
+	.cbi-title .label[data-indicator="poll-status"]::after {
 		content: "";
 		width: 7px;
 		height: 7px;
@@ -128,8 +126,7 @@
 		margin-top: -2px;					/* optical centring of the down chevron */
 		transition: transform var(--fs-dur-move);
 	}
-	.cbi-title .label[data-indicator="poll-status"][data-style="inactive"]::after,
-	button.fs-ap-fold[aria-expanded="true"] .fs-ap-chev::after {
+	.cbi-title .label[data-indicator="poll-status"][data-style="inactive"]::after {
 		transform: rotate(-135deg);			/* open: chevron up */
 		margin-top: var(--fs-space-0-5);
 	}

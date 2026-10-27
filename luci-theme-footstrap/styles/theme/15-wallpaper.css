@@ -38,6 +38,6 @@
 		background-size: var(--fs-pattern-size) auto;
 	}
 
-	/* No wash layer behind #view: cards paint their own opaque --fs-panel, so nothing needs
-	 * dimming globally. */
+	/* No wash layer behind #view: cards paint their own --fs-panel (opaque unless 17-glass.css
+	 * thins it), so nothing needs dimming globally. */
 }

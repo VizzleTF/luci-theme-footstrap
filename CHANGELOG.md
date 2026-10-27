@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### Added
+
+- **Cards and the menu can let the wallpaper show through (#87).** System → Footstrap → Background gains Card opacity and Menu opacity (0–100%, default 100) and a Material: Flat keeps each colour at that opacity, Frosted blurs the wallpaper under each card, Acrylic adds a stronger blur, grain and a lit edge, and Blur (0–200%, default 100) scales Frosted's and Acrylic's blur. Everything on a card goes with it, the Overview port tiles and an app's own tiles included, and the menu's dropdowns and flyouts follow Menu opacity; modals, open lists and tooltips stay solid. It acts only under a wallpaper, stays off when the system asks for less transparency or more contrast, and Save to router stores it as `card_opacity`, `bar_opacity`, `material` and `blur`; an existing `/etc/config/footstrap` keeps working unchanged.
+
+### Changed
+
+- **System → Footstrap is four tabs instead of two sections and two folds.** Colour scheme, Interface, Background and Colours are LuCI's own tabs, the open one kept for the session, and Saving stays under them. Two- and three-way choices are pills instead of dropdowns, a contrast line shows only when a colour fails AA, and the colour rows' labels line up with the field. Every uci option keeps its name and values.
+
 ### Fixed
 
 - **A ComboButton (the Wi-Fi client's Disconnect / Add to Blacklist) is the width of its label, with a divider before the arrow, a button's font, and a menu that opens.** On a phone it stretched across the whole card, its label was 16px beside 13px buttons, and the row and the card clipped its open list to the button's height.

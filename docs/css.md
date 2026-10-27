@@ -298,7 +298,12 @@ render the log as a 210px column.
 
 The controls are an ordinary page. Sections are stock `.cbi-section` cards and rows are stock
 `.cbi-value`; caption column, field column and row hairline come from `base/30-forms.css` and
-`theme/60-inputs.css`, like every other LuCI form.
+`theme/60-inputs.css`, like every other LuCI form. Four of the cards are the panes of one tab group
+(`ui.tabs.initTabGroup`), so the strip, its styling and the tab kept for the session are LuCI's. An
+inactive pane leaves the layout (`display: none`): the stock rule only zeroes its height, and a
+card's padding, border and gap would stand as an empty bar. A choice of two or three values is a row of pills
+(`.fs-seg`): a radio group drawn as one inset, with the checked value raised on it as a card. The
+radios stay in the box, so the arrow keys still move the choice.
 
 - No preset colour chips: the Accent row does the same job with any colour.
 - No hue slider in the colour control. Two controls for one value read as two settings, and the
@@ -306,14 +311,13 @@ The controls are an ordinary page. Sections are stock `.cbi-section` cards and r
   by it, so a saved value keeps painting.
 - In `data-layout="top"` CSS hides `.fs-ap-submenus`, because those sections are hover dropdowns
   there. CSS, not a JS branch: the page is built once, and a branch would freeze the control to the
-  layout it loaded in.
-
-The disclosure chevron (`.fs-ap-chev`) shares one rule in `theme/45-misc.css` with the Overview
-card toggle, so the two cannot drift.
+  layout it loaded in. The Transparency rows (`.fs-ap-glass`) hide the same way without a
+  wallpaper, and Material (`.fs-ap-material`) while both opacities are at 100%.
 
 The colour-contrast readout (`.fs-color-contrast` and its three grade colours) shows the live ratio
-against the surface the colour is read on (`contrastRatio` in `fs-appearance.js`). It is a readout,
-not a validation: the theme never corrects a colour the admin asked for.
+against the surface the colour is read on (`contrastRatio` in `fs-appearance.js`). It appears only
+below AA: a passing colour needs no line under it. It is a readout, not a validation: the theme
+never corrects a colour the admin asked for.
 
 ### Overview: the disclosure pill, the grid, and the duplicate heading
 

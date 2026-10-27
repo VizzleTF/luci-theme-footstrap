@@ -166,6 +166,11 @@ Do not add a name to fix an app's typo, such as justclash's `--text-color`: we w
 forever. The private `--fs-*` tier is not part of the contract. See
 [design-system.md](design-system.md).
 
+The surface and rule names turn translucent while the Card opacity axis is below 100% (see
+[design-system.md](design-system.md#transparency-cards-and-the-menu-over-the-wallpaper)). An app
+popup painted with `--background-color-high` turns translucent with them; the theme's own floating
+surfaces take the solid palette back.
+
 ### Rule 7. The chrome is fenced off, in three places that must agree
 
 A sheet whose every selector is pinned to the app's own names stays unlayered, and its

@@ -1,48 +1,83 @@
 @layer page {
-	/* The axis controls are page content, not chrome (fs-appearance.js): docs/css.md "Appearance: from popover to page, and what stayed CSS". */
+	/* The settings page is ordinary page content: stock .cbi-section cards and .cbi-value rows
+	 * (fs-appearance.js). docs/css.md "Appearance: from popover to page, and what stayed CSS". */
 
-	.fs-ap { display: flex; flex-direction: column; gap: var(--fs-space-5); }
-	.fs-ap-note p:first-child { margin-top: 0; }
-	.fs-ap-note p:last-child { margin-bottom: 0; }
-	/* heading row: on a folded group the WHOLE row is the disclosure button inside the h2, full
-	 * width so the target is the heading, not a chevron nobody can hit on a phone. `font: inherit`
-	 * hands the button the heading's size, weight and leading, which a button resets to the UA's. */
-	button.fs-ap-fold {
-		display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-3);
-		inline-size: 100%; padding: 0; margin: 0;
-		background: none; border: 0; cursor: pointer; text-align: start; color: inherit; font: inherit;
+	.fs-ap > .fs-ap-card:last-child { margin-bottom: 0; }
+	/* The tab panes are whole cards (ui.tabs, fs-appearance.js). The stock rule hides an inactive
+	 * pane by height and leaves its padding, border and gap standing as an empty bar; nothing in
+	 * these panes measures itself, so it can leave the layout instead. */
+	.fs-ap-panes > [data-tab-title]:not([data-tab-active="true"]) { display: none; }
+
+	/* a subheading splits a card: the eyebrow over the rows it introduces */
+	.fs-ap-sub h4 {
+		margin: var(--fs-space-5) 0 var(--fs-space-1);
+		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking);
+		text-transform: uppercase; color: var(--fs-eyebrow-color);
 	}
-	button.fs-ap-fold:hover { color: var(--fs-accent); }
-	button.fs-ap-fold:focus-visible { outline: none; box-shadow: var(--fs-focus-ring-solo); border-radius: var(--fs-radius-sm); }
-	/* the chevron glyph itself is in theme/45-misc.css, shared with the overview card toggle */
-	.fs-ap-chev {
-		flex: 0 0 auto; inline-size: 26px; block-size: 26px;
-		display: inline-flex; align-items: center; justify-content: center;
-		color: var(--fs-dim); border-radius: var(--fs-radius-sm);
-	}
-	button.fs-ap-fold:hover .fs-ap-chev { color: var(--fs-accent); }
-	.fs-ap-sub { margin-top: var(--fs-space-4); }
-	.fs-ap-head :is(h2, h3) {
-		margin: 0;
-		font-size: var(--fs-type); font-weight: var(--fs-weight-bold); color: var(--fs-text);
-	}
-	.fs-ap-section + .fs-ap-section { padding-top: var(--fs-space-4); border-top: var(--fs-hairline); }
+
 	/* rows are stock .cbi-value with no layout of their own — base/30-forms.css and
 	 * theme/60-inputs.css already draw every other LuCI form this way. docs/css.md above. */
 	:root[data-layout="top"] .fs-ap-submenus { display: none; }
+	/* the glass needs a wallpaper behind it, Material a surface that is glass, Blur a material that blurs */
+	:root:not([data-wallpaper]) .fs-ap-glass,
+	:root:not([data-glass]):not([data-glass-bar]) .fs-ap-material,
+	:root[data-material="flat"] .fs-ap-blur { display: none; }
+	/* theme/60-inputs.css drops the hairline under a row with no row after it; here the rows after
+	 * one can be hidden (the other wallpaper's, the glass), so the last row SHOWN goes without */
+	.fs-ap-card .cbi-value:not(:has(~ .cbi-value:not([hidden]))),
+	:root:not([data-wallpaper]) .fs-ap-card .cbi-value:not(:has(~ .cbi-value:not([hidden], .fs-ap-glass))),
+	:root:not([data-glass]):not([data-glass-bar]) .fs-ap-card .cbi-value:not(:has(~ .cbi-value:not([hidden], .fs-ap-material))),
+	:root[data-material="flat"] .fs-ap-card .cbi-value:not(:has(~ .cbi-value:not([hidden], .fs-ap-blur))) {
+		border-bottom: 0;
+	}
 
+	/* Pills: a radio group drawn as one inset row, the checked choice raised on it as a card. The
+	 * radio stays in the box, transparent, so the pill is its hit area and the arrow keys still move
+	 * the choice; sans, as the field column hands its descendants mono (theme/60-inputs.css). */
+	.fs-seg {
+		display: inline-flex; flex-wrap: wrap; gap: var(--fs-space-0-5);
+		max-inline-size: 100%; padding: var(--fs-space-0-5);
+		background: var(--fs-panel2); border: var(--fs-hairline); border-radius: var(--fs-radius);
+	}
+	.fs-seg > label { position: relative; display: flex; margin: 0; cursor: pointer; }
+	.fs-seg input[type="radio"] {
+		position: absolute; inset: 0; inline-size: 100%; block-size: 100%; margin: 0;
+		opacity: 0; cursor: pointer;
+	}
+	.fs-seg span {
+		display: block; padding: var(--fs-space-1) var(--fs-space-3);
+		border-radius: calc(var(--fs-radius) - 2px);
+		font-family: var(--fs-font-sans); font-size: var(--fs-type); font-weight: var(--fs-weight);
+		line-height: var(--fs-leading); color: var(--fs-dim); white-space: nowrap;
+		transition: background var(--fs-dur), color var(--fs-dur), box-shadow var(--fs-dur);
+	}
+	.fs-seg > label:hover span { color: var(--fs-text); }
+	.fs-seg input:checked + span {
+		background: var(--fs-panel); color: var(--fs-text); font-weight: var(--fs-weight-bold);
+		box-shadow: 0 0 0 1px var(--fs-border), 0 1px 2px rgb(0 0 0 / .1);
+	}
+	.fs-seg input:focus-visible + span { box-shadow: var(--fs-focus-ring-solo); }
+
+	.fs-ap-lead { margin: 0 0 var(--fs-space-3); color: var(--fs-dim); }
 	.fs-ap-actrow, .fs-ap-bgrow { display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
 	.fs-ap-actgap { flex: 0 0 var(--fs-space-4); }
 	.fs-ap-actrow .btn, .fs-ap-bgrow .btn { padding: var(--fs-space-2) var(--fs-space-2-5); }
 	/* primed Reset (2nd click confirms) reads as the destructive action it is */
 	.fs-ap-armed { color: var(--fs-on-danger); background: var(--fs-danger); border-color: transparent; }
 	.fs-ap-err { margin-top: var(--fs-space-2); font-size: var(--fs-type-xs); line-height: 1.35; color: var(--fs-danger); }
+	.fs-ap-help {
+		display: grid; gap: var(--fs-space-1);
+		margin: var(--fs-space-3) 0 0; padding: 0; list-style: none;
+		font-size: var(--fs-type-xs); line-height: 1.4; color: var(--fs-dim);
+	}
 
 	.fs-colorctl { display: flex; flex-direction: column; gap: var(--fs-space-1-5); max-width: var(--fs-field-max); }
-	.fs-color-row { display: flex; align-items: center; gap: var(--fs-space-2); }
+	/* the hex field hands the row its text baseline, so the label lines up with it; a colour input
+	 * has none and would lend its bottom edge instead */
+	.fs-color-row { display: flex; align-items: baseline; gap: var(--fs-space-2); }
 	/* native swatch strips the browser's own inset well to the frame's edge (both engines) */
 	input[type="color"].fs-color-swatch {
-		flex: 0 0 auto; inline-size: 34px; block-size: 34px; padding: 0; cursor: pointer;
+		flex: 0 0 auto; align-self: center; inline-size: 34px; block-size: 34px; padding: 0; cursor: pointer;
 		background: none; border: var(--fs-hairline); border-radius: var(--fs-radius-sm);
 	}
 	input[type="color"].fs-color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
@@ -55,8 +90,8 @@
 	}
 	.fs-color-clear { flex: 0 0 auto; font-size: var(--fs-type-xs); padding: var(--fs-space-1-5) var(--fs-space-2); }
 
-	/* live contrast readout, not a validation — docs/css.md above */
-	.fs-color-contrast { font-variant-numeric: tabular-nums; }
+	/* live contrast readout, not a validation, shown only below AA — docs/css.md above */
+	.fs-color-contrast { font-family: var(--fs-font-sans); font-size: var(--fs-type-xs); font-variant-numeric: tabular-nums; }
 	.fs-contrast-aa { color: var(--fs-good); }
 	.fs-contrast-aa-large { color: var(--fs-warn); }
 	.fs-contrast-low { color: var(--fs-danger); }
@@ -72,7 +107,7 @@
 
 	.fs-ap-footer {
 		display: flex; flex-direction: column; gap: var(--fs-space-2);
-		margin-top: var(--fs-space-0-5); padding-top: var(--fs-space-2-5); border-top: var(--fs-hairline);
+		margin-top: var(--fs-space-4); padding-top: var(--fs-space-2-5); border-top: var(--fs-hairline);
 	}
 	.fs-ap-verrow { display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-2-5); }
 	.fs-ap-version { position: relative; font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; text-decoration: none; }
