@@ -61,6 +61,14 @@ jobs:
         with:
           path: .owlab/cache
           key: owlab-fetch-owrt2512-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}
+      # build.yml e2e's saved router image, which tools/ci-stand.sh starts as it is.
+      - id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+      - id: stand
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/owlab-stand
+          key: owlab-stand-owrt2512-${{ runner.arch }}-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}-${{ steps.week.outputs.week }}
       - name: Start the router in the background
         run: |
           (sh tools/ci-stand.sh owrt2512; echo $? > "$RUNNER_TEMP/owlab-up.tmp" && mv "$RUNNER_TEMP/owlab-up.tmp" "$RUNNER_TEMP/owlab-up.rc") \
@@ -125,7 +133,8 @@ jobs:
           while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
           cat "$RUNNER_TEMP/owlab-up.log"
           exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
-      - if: steps.owlabfetch.outputs.cache-hit != 'true'
+      # Only after a build: a router started from the saved image fetched nothing.
+      - if: steps.owlabfetch.outputs.cache-hit != 'true' && hashFiles('.owlab/cache/**') != ''
         uses: actions/cache/save@v6
         with:
           path: .owlab/cache
@@ -147,11 +156,12 @@ jobs:
             rc=0
             node tools/anchor-mutants.mjs --router owrt2512 --only ${{ matrix.mutant }} 2>&1 | tee "$RUNNER_TEMP/mutant.txt" || rc=$?
             # 1 with no SURVIVED line: no verdict (the stand stopped answering, a hang, a crash).
-            # Once more on a fresh router, as `anchor` does on its exit 3; a survivor, a mutant that
-            # no longer applies (2) or a kill is the verdict.
+            # Once more on a fresh router, built as `anchor` builds one on its exit 3; a survivor, a
+            # mutant that no longer applies (2) or a kill is the verdict.
             if [ "$rc" -ne 1 ] || grep -q '^SURVIVED ' "$RUNNER_TEMP/mutant.txt" || [ "$try" -eq 2 ]; then break; fi
             echo "::warning title=Mutant ${{ matrix.mutant }}::no verdict; measuring once more on a fresh router"
             timeout -k 10 120 owlab down owrt2512 || true
+            rm -f "$HOME/.cache/owlab-stand/owrt2512.tar"
             sh tools/ci-stand.sh owrt2512
             sh tools/ci-install.sh owrt2512 "$RUNNER_TEMP"/luci-theme-footstrap-[0-9]*.apk
           done
