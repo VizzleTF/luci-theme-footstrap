@@ -354,7 +354,7 @@ export async function waitForQuiet({
  * lost behind the ones that landed (the `response` listener never awaits its own work). Returns
  * `{settled, abandoned}` rather than throwing: whether a lost read is fatal depends on what it read,
  * and only capture.mjs's `drain()` knows. Bounded by `timeoutMs` (15 s): a read that never settles
- * (one stuck ~148 s on a stand, past capture's 5-minute kill) is named in `abandoned`. */
+ * (one stuck ~148 s on a stand) is named in `abandoned`. */
 export async function drainReads(reads, timeoutMs = 15000) {
 	const remaining = new Map(reads.map(([ label ], i) => [ i, label ]));
 	const results = new Array(reads.length);

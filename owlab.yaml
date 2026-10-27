@@ -125,11 +125,13 @@ defaults:
 
 routers:
   - id: owrt2512
-    # 25.12.4, NOT .5: the stand builds from openwrt/rootfs:x86_64-<release> and that tag has to
-    # EXIST in the registry — 25.12.5 publishes none, so `owlab up` cannot resolve it. CI's e2e job
-    # boots its stands from this file. Check `docker manifest inspect openwrt/rootfs:x86_64-<release>`
-    # before bumping it.
-    release: "25.12.4"
+    # The rootfs comes from ghcr.io: the same digest as Docker Hub's openwrt/rootfs, without Docker
+    # Hub's pull limit or outages. A named `image:` also skips owlab's tag lookup on hub.docker.com
+    # and its fallback to the rootfs tarball, so the tag has to EXIST. `image:` and `release:` move
+    # together: check `docker manifest inspect ghcr.io/openwrt/rootfs:x86_64-<release>` before
+    # bumping either. Every CI job with a router boots it from this file.
+    release: "25.12.5"
+    image: ghcr.io/openwrt/rootfs:x86_64-25.12.5
     ports: { http: 8025, ssh: 2225 }
     # Third-party apps whose stylesheets this theme has to share a document with. They are the
     # hardest case the theme handles, and no text file can reason about them: justclash ships no
@@ -166,7 +168,9 @@ routers:
         ipk: https://github.com/zerolabnet/ssclash/releases/download/v4.7.0/luci-app-ssclash_4.7.0-r1_all.ipk
 
   - id: owrt2410
+    # From ghcr.io, as owrt2512's: `image:` and `release:` move together.
     release: "24.10.8"
+    image: ghcr.io/openwrt/rootfs:x86_64-24.10.8
     ports: { http: 8024, ssh: 2224 }
     extra_packages: *third_party_apps
 

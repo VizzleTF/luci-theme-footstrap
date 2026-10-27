@@ -45,7 +45,7 @@ that matter for an ordinary change are the package-manager pair:
 
 | id | distro | release | manager | LuCI |
 |---|---|---|---|---|
-| `owrt2512` | OpenWrt | 25.12.4 | apk | http://localhost:8025 |
+| `owrt2512` | OpenWrt | 25.12.5 | apk | http://localhost:8025 |
 | `owrt2410` | OpenWrt | 24.10.8 | opkg | http://localhost:8024 |
 
 `owlab.yaml` also carries `owrtsnap`, which tracks luci-base's master. Two ImmortalWrt stands boot
@@ -58,7 +58,8 @@ owlab open owrt2512      # open LuCI in a browser
 ```
 
 Log in as `root` with an empty password. Inside is the release's real userland (procd as PID 1,
-netifd, ubus, rpcd, uhttpd) from its own rootfs tarball, not a home-made imitation.
+netifd, ubus, rpcd, uhttpd) from its own rootfs image, not a home-made imitation. `owlab.yaml` names
+the `ghcr.io/openwrt/rootfs` image for the two above; owlab finds `owrtsnap`'s itself.
 
 - **Reach them only through `localhost:<port>`.** The docker bridge address routes from the host on
   native Linux and inside WSL2, but not on Docker Desktop for macOS or Windows. So no command here
@@ -261,14 +262,19 @@ Two harness facts hold behind `tools/lib/stands.mjs`, which `capture` reads the 
 
 - **`sealToRouter()` aborts every request that leaves the router's origin** (data:/blob: pass). A
   run then stops depending on github.com and its rate limit; ssclash asks GitHub for a release on
-  two pages. The route is a predicate, never a catch-all glob. A glob hands every request to a JS
-  callback, hundreds the router serves itself among them, and slows a run past CI's time limit. It
-  aborts rather than faking a 200, which the page would render.
+  two pages. Playwright turns the predicate into a catch-all glob, so every request passes through
+  a JS callback and the browser's HTTP cache is off; that costs little at capture's one page at a
+  time. `tools/e2e.mjs`, which loads hundreds of pages, seals its browser with a launch proxy
+  instead (`proxy: { server: 'http://127.0.0.1:9', bypass: 'localhost' }`): every other host is
+  refused at once, and the cache stays on. The route aborts rather than faking a 200, which the
+  page would render.
 - **`menuPaths()` waits for `window.L.require` before asking for `ui`:** `L.ui` exists only once
   something has required ui.js, which on 24.10 is not yet the case straight after the login
-  redirect. The tree arrives rooted
-  at `admin`, so the walk starts with an empty path (seeding `admin` yields `/admin/admin/...`, a
-  sweep of 404s that reads as a clean run).
+  redirect. The tree arrives rooted at `admin`, so the walk starts with an empty path (seeding
+  `admin` yields `/admin/admin/...`, a sweep of 404s that reads as a clean run). The tree has 30 s
+  to load: `L.Request` has no clock, and a stand that stopped answering while the menu loaded held
+  the caller to its step's timeout. A timeout is a `StandDown` only when LuCI's root then stays
+  silent for a minute (`stoodDown()`), else an error the caller judges.
 
 ## The stand's own traps
 
@@ -455,7 +461,7 @@ Through owlab, an SDK build that writes `dist/<arch>/`, not owfeed's `dist/noarc
 
 ```sh
 owlab build                       # target taken from the first router in owlab.yaml; writes dist/<arch>/
-owlab build --arch x86_64 --release 25.12.4
+owlab build --arch x86_64 --release 25.12.5
 owlab install owrt2512 'dist/<arch>/luci-theme-footstrap-*.apk'
 owlab exec owrt2512 -- 'apk del luci-theme-footstrap'
 ```

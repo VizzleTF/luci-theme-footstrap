@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /* Proves a `build.mjs` output offline, in a real Chromium: serves `--out` under `--base` and opens
  * every recorded page. Fails a page on a `pageerror`, a non-empty `window.__pgMiss` (replay.js's
- * own miss log), any 404, or an empty `#view` once the page has settled. Also proves the ONE client navigation
- * (overview -> footstrap, `docs/spa-router.md`) does not fall back to a full load, that an
- * Appearance change both takes effect and survives a reload, and that the login gate
- * (`replay.js`) sends an unauthenticated visit to the login form, accepts any credentials, and
- * `.fs-logout` sends the reader back.
+ * own miss log), any 404, or a `#view` that never replaces its Loading spinner or renders empty.
+ * Also proves the ONE client navigation (overview -> footstrap, `docs/spa-router.md`) does not fall
+ * back to a full load, that an Appearance change both takes effect and survives a reload, and that
+ * the login gate (`replay.js`) sends an unauthenticated visit to the login form, accepts any
+ * credentials, and `.fs-logout` sends the reader back.
  *
  * Needs `--out` already built (`playground:build`); never touches a router.
  *
@@ -40,6 +40,10 @@ const OUT = FLAGS.out;
 const BASE = FLAGS.base;
 const BUDGET_KB = FLAGS['budget-kb'];
 const SETTLE_MS = 1400;
+/* A view replayed from local files renders in well under a second; 15 s is a loaded runner. */
+const VIEW_TIMEOUT_MS = 15000;
+/* After render: a late pageerror, 404 or ubus miss from the view's own first requests still lands. */
+const QUIET_TAIL_MS = 500;
 
 const TYPES = {
 	'.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
@@ -94,13 +98,22 @@ async function checkPage(context, serverBase, p, fail) {
 	page.on('response', (r) => { if (r.status() === 404) problems.push(`404: ${r.url()}`); });
 
 	await page.goto(`${serverBase}/cgi-bin/luci/${p}`, { waitUntil: 'load' });
-	await page.waitForTimeout(SETTLE_MS);
+	/* Rendered = e2e.mjs's RENDERED minus its #maincontent fallback (pages.json lists views only):
+	 * the recorded #view ships "Loading view…" as its text, so a non-empty textContent held even
+	 * for a view that never rendered. Waited for, not slept on. */
+	const rendered = await page.waitForFunction(() => {
+		const v = document.getElementById('view');
+		return !!v && v.children.length > 0 && !v.querySelector(':scope > .spinning');
+	}, null, { timeout: VIEW_TIMEOUT_MS }).then(() => true, () => false);
+	await page.waitForTimeout(QUIET_TAIL_MS);
 
 	const miss = await page.evaluate(() => window.__pgMiss || []);
 	if (miss.length) problems.push(`__pgMiss: ${JSON.stringify(miss)}`);
 
+	/* Still read once rendered: RENDERED holds for a view that rendered an empty element. */
 	const viewFilled = await page.$eval('#view', (el) => el.textContent.trim().length > 0).catch(() => false);
-	if (!viewFilled) problems.push('#view is empty after settle');
+	if (!rendered) problems.push(`#view did not render within ${VIEW_TIMEOUT_MS} ms (still the Loading spinner)`);
+	else if (!viewFilled) problems.push('#view rendered empty');
 
 	if (problems.length) fail(`${p}: ${problems.join('; ')}`);
 	await page.close();
@@ -135,9 +148,12 @@ async function checkSpaNav(context, serverBase, fail) {
 	await page.goto(`${serverBase}/cgi-bin/luci/admin/status/overview`, { waitUntil: 'load' });
 	await page.waitForTimeout(SETTLE_MS);
 
-	const link = await page.evaluateHandle(() => Array.from(document.querySelectorAll('a[href]'))
-		.find((a) => (a.getAttribute('href') || '').endsWith('/footstrap')));
-	const el = link.asElement();
+	/* Waited for past the settle: a loaded runner draws the menu late, not never. The router is
+	 * wired in the same turn that draws it (menu-footstrap-common.js). */
+	const link = await page.waitForFunction(() => Array.from(document.querySelectorAll('a[href]'))
+		.find((a) => (a.getAttribute('href') || '').endsWith('/footstrap')), null, { timeout: VIEW_TIMEOUT_MS })
+		.catch(() => null);
+	const el = link && link.asElement();
 	if (!el) { fail('spa: no link to the footstrap page in the rendered menu'); await page.close(); return; }
 
 	await openAncestorSections(page, el);
@@ -159,9 +175,9 @@ async function checkPalette(context, serverBase, fail) {
 	await page.goto(`${serverBase}/cgi-bin/luci/admin/system/footstrap`, { waitUntil: 'load' });
 	await page.waitForTimeout(SETTLE_MS);
 
-	const handle = await page.evaluateHandle(
-		() => document.querySelector('select[aria-label="Palette"]'));
-	const select = handle.asElement();
+	/* attached, not visible: fs-select.js hides it (below); waited for past the settle, as the SPA link */
+	const select = await page.waitForSelector('select[aria-label="Palette"]',
+		{ state: 'attached', timeout: VIEW_TIMEOUT_MS }).catch(() => null);
 	if (!select) { fail('palette: no Palette control on the Appearance page'); await page.close(); return; }
 
 	const options = await select.$$eval('option', (opts) => opts.map((o) => o.value));
@@ -179,7 +195,8 @@ async function checkPalette(context, serverBase, fail) {
 		el.value = v;
 		el.dispatchEvent(new Event('change', { bubbles: true }));
 	}, 'hicontrast');
-	await page.waitForTimeout(200);
+	await page.waitForFunction(() => document.documentElement.dataset.palette === 'hicontrast', null, { timeout: 5000 })
+		.catch(() => {});
 
 	const applied = await page.evaluate(() => document.documentElement.dataset.palette);
 	if (applied !== 'hicontrast') fail(`palette: dataset.palette is "${applied}", not "hicontrast"`);

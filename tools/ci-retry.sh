@@ -1,12 +1,14 @@
 #!/bin/sh
-# Run a network install under a clock, and again if it stalls.
+# Run a network fetch under a clock, and again if it stalls or fails.
 #
 #   sh tools/ci-retry.sh <seconds> <command…>
 #
-# The two things a job of ours fetches from somebody else's server — apt and the Playwright CDN — do
-# not fail when the far side is unwell, they STALL, and a hung step is not a failed step: nothing
-# retries it and the job's own timeout is the only thing that ends it. So each attempt gets a
-# deadline of its own; a genuinely broken command still fails on the first attempt.
+# What a job of ours fetches from somebody else's server — apt, the Playwright CDN, owfeed's SDK,
+# a release asset — does not fail when the far side is unwell, it STALLS, and a hung step is not a
+# failed step: nothing retries it and the job's own timeout is the only thing that ends it. So each
+# attempt gets a deadline of its own. A command that fails rather than stalls runs again too, unless
+# CI_RETRY_ON names the exits that mean an outage (`CI_RETRY_ON=8 sh tools/ci-retry.sh 240 owfeed
+# build`): any other exit is then an answer and ends the run at once.
 #
 # The attempt is a process GROUP, not a process: `timeout` signals the child it started and nothing
 # below it, so killing `npx playwright install --with-deps` leaves the `apt-get` it spawned running
@@ -24,17 +26,24 @@ shift
 
 TRIES=3
 STALLED=124
+RETRY_ON="${CI_RETRY_ON:-}"	# the exits that mean an outage, besides a stall; empty: any
+# The watchdog's note that it fired. Made here, under set -e: a directory the watchdog could not write
+# to would have stopped it before its TERM, silently.
+MARK=$(mktemp "${TMPDIR:-/tmp}/ci-retry.XXXXXX")
+trap 'rm -f "$MARK"' EXIT
 
 # Runs the command in its own session and kills the whole group if it outlives the deadline.
 # Answers 0, the command's status, or $STALLED.
 attempt() {
+	rm -f "$MARK"
 	setsid "$@" &
 	pgid=$!
 
 	( sleep "$SECONDS_PER_TRY"
+	  : >"$MARK"
 	  kill -TERM -"$pgid" 2>/dev/null || true
 	  sleep 20
-	  kill -KILL -"$pgid" 2>/dev/null || true ) &
+	  kill -KILL -"$pgid" 2>/dev/null || true ) </dev/null >/dev/null 2>&1 &
 	watchdog=$!
 
 	rc=0
@@ -44,14 +53,14 @@ attempt() {
 	kill "$watchdog" 2>/dev/null || true
 	wait "$watchdog" 2>/dev/null || true
 
-	# 143/137 are the TERM and KILL the watchdog sent; anything else is the command's own answer.
-	case "$rc" in
-		143|137) return "$STALLED" ;;
-		*)       return "$rc" ;;
-	esac
+	# The watchdog fired: a stall, whatever the command answered its TERM with. Not 143/137 alone:
+	# owfeed catches TERM and exits 7, which CI_RETRY_ON would take for an answer.
+	if [ "$rc" -ne 0 ] && [ -e "$MARK" ]; then return "$STALLED"; fi
+	return "$rc"
 }
 
-# What a killed apt leaves behind. Not reached when the command is not apt, and harmless there.
+# What a killed apt leaves behind. Run only after an apt command: it kills apt and rotates the
+# mirror list.
 clear_apt() {
 	sudo -n pkill -KILL -x apt-get 2>/dev/null || true
 	sudo -n pkill -KILL -x dpkg 2>/dev/null || true
@@ -75,15 +84,27 @@ while [ "$i" -le "$TRIES" ]; do
 	# `[ … ] && exit 0` would be a failing top-level list under `set -e` on every unsuccessful
 	# attempt, i.e. no retries at all.
 	if [ "$rc" -eq 0 ]; then exit 0; fi
+	if [ -n "$RETRY_ON" ] && [ "$rc" -ne "$STALLED" ] && ! printf ' %s ' "$RETRY_ON" | grep -q " $rc "; then
+		echo "ci-retry: exit $rc is an answer, not an outage: $*" >&2
+		exit "$rc"
+	fi
 
 	if [ "$rc" -eq "$STALLED" ]; then
 		echo "ci-retry: attempt $i of $TRIES stalled past ${SECONDS_PER_TRY}s: $*" >&2
 	else
 		echo "ci-retry: attempt $i of $TRIES failed (exit $rc): $*" >&2
 	fi
-	[ "$i" -lt "$TRIES" ] || { echo "ci-retry: giving up after $TRIES attempts" >&2; exit "$rc"; }
+	if [ "$i" -ge "$TRIES" ]; then
+		echo "ci-retry: giving up after $TRIES attempts" >&2
+		# Given up on a stall, or on exits CI_RETRY_ON calls an outage: the title
+		# .github/workflows/rerun-infra.yml re-runs a run by. Any other exit is not ours to classify.
+		if [ "$rc" -eq "$STALLED" ] || [ -n "$RETRY_ON" ]; then
+			echo "::error title=Upstream outage (safe to rerun)::$*" >&2
+		fi
+		exit "$rc"
+	fi
 
-	clear_apt
+	case " $* " in *" install-deps "*|*" --with-deps "*|*" apt-get "*) clear_apt ;; esac
 	sleep $((i * 15))
 	i=$((i + 1))
 done

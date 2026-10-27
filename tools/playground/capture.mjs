@@ -58,6 +58,10 @@ const QUIET_TIMEOUT_MS = 30000;
  * of the run is the actual proof the overlay's keys got captured, and a page whose `L.Poll` never
  * truly stalls asks the same call again on its next tick. */
 const DRAIN_TIMEOUT_MS = 15000;
+/* Playwright puts no clock on `page.evaluate`: a fetch inside one that a hung uhttpd never answers
+ * held capture to the job's timeout. The page aborts it at this bound instead, the same 30 s each
+ * navigation's response wait below gets. */
+const FETCH_TIMEOUT_MS = 30000;
 
 const pages = JSON.parse(readFileSync(PAGES_FILE, 'utf8'));
 /* Read once here (not just inside `applyOverlay` at build time) so a key this stand never actually
@@ -72,7 +76,7 @@ function themeVersion(standId) {
 	try {
 		const out = execFileSync('owlab', [ 'exec', standId, '--',
 			'opkg list-installed luci-theme-footstrap 2>/dev/null || apk info -e -a luci-theme-footstrap 2>/dev/null' ],
-		{ encoding: 'utf8' });
+		{ encoding: 'utf8', timeout: 60000 });
 		const m = out.match(/luci-theme-footstrap\s*-\s*([^\s]+)|luci-theme-footstrap-([^\s]+)/);
 		return (m && (m[1] || m[2])) || 'unknown';
 	} catch (e) {
@@ -88,12 +92,36 @@ function themeVersion(standId) {
 function listStaticDir(standId, dir) {
 	try {
 		const out = execFileSync('owlab', [ 'exec', standId, '--', 'ls', '-1', `/www/luci-static/${dir}` ],
-			{ encoding: 'utf8' });
+			{ encoding: 'utf8', timeout: 60000 });
 		return parseLsLines(out);
 	} catch (e) {
+		/* an exec that never returns, or one the daemon refuses (the container paused, stopped or
+		 * gone; `owlab exec` passes docker's stderr through), is the stand, as in anchor-check.mjs's
+		 * sh(); a failed `ls` stays loud */
+		const refused = String(e.stderr || '').match(/^Error response from daemon.*$/m);
+		if (e.code === 'ETIMEDOUT')
+			throw new StandDown(`${standId}: owlab exec did not return in 60 s — the stand, not the theme`);
+		if (refused)
+			throw new StandDown(`${standId}: ${refused[0]} — the stand, not the theme`);
 		throw new Error(`playground/capture: could not list /www/luci-static/${dir} on ${standId}: ${e.message}`);
 	}
 }
+
+/* What `page.evaluate` rethrows when a fetch inside it got no answer, as measured against a hung
+ * and a reset socket: Chromium's network failure, the timeout signal on the request, and the abort
+ * that signal puts on a body still arriving. `unreached` reads navigation errors only. Anything
+ * else (a menu that is not JSON) is a bug and keeps its stack. */
+const NO_FETCH = /^page\.evaluate: (TypeError: Failed to fetch|TimeoutError: signal timed out|AbortError: )/;
+const fetchCause = (e) => String(e.message).split('\n')[0].replace(/^page\.evaluate: /, '');
+const unfetched = (e, id, url) => (e && NO_FETCH.test(String(e.message)))
+	? new StandDown(`${id}: ${url} did not answer (${fetchCause(e)}) — the stand, not the theme`) : e;
+
+/* Whether uhttpd answers at all, asked from node for a file it serves from disk (the one
+ * tools/ci-stand-state.sh asks for), any status counting. A page that never goes quiet, or a body
+ * read that failed, is the stand's only when this is silent too: a template of the theme that
+ * holds LuCI's handlers busy leaves uhttpd's files answering, a paused or hung stand does not. */
+const answers = (origin) => fetch(`${origin}/luci-static/resources/luci.js`,
+	{ method: 'HEAD', signal: AbortSignal.timeout(10000) }).then(() => true, () => false);
 
 async function main() {
 	const [ stand ] = requireStands(stands(STAND_ID), 'playground/capture');
@@ -144,8 +172,11 @@ async function main() {
 			else
 				fatal.push(detail);
 		}
-		if (fatal.length)
-			throw new Error(`playground/capture: ${phase}: ${fatal.length} response read failure(s) — ${fatal.join('; ')}`);
+		if (!fatal.length) return;
+		const what = `${phase}: ${fatal.length} response read failure(s) — ${fatal.join('; ')}`;
+		if (!await answers(origin))
+			throw new StandDown(`${stand.id}: ${origin} stopped answering; ${what} — the stand, not the theme`);
+		throw new Error(`playground/capture: ${what}`);
 	}
 
 	async function recordStatic(response) {
@@ -172,10 +203,11 @@ async function main() {
 	const loginPage = await loginContext.newPage();
 	loginPage.on('response', (response) =>
 		track(`login ${describePendingRequest('GET', response.url(), null)}`, recordStatic(response)));
+	/* on the pair, not the goto: against a hung uhttpd the response wait may time out first */
 	const [ loginResponse ] = await Promise.all([
 		loginPage.waitForResponse((r) => r.request().resourceType() === 'document', { timeout: 30000 }),
-		loginPage.goto(stand.base, { waitUntil: 'load' }).catch((e) => { throw unreached(e, stand.id, stand.base); }),
-	]);
+		loginPage.goto(stand.base, { waitUntil: 'load' }),
+	]).catch((e) => { throw unreached(e, stand.id, stand.base); });
 	await loginPage.waitForTimeout(SETTLE_MS);
 	await drain('login page');
 	writeFile(join(OUT, 'docs', 'login.html'), await loginResponse.body());
@@ -261,17 +293,18 @@ async function main() {
 	 * beats shipping a 404 the tester finds three steps later. `menuPaths()` walks the tree
 	 * `action_menu` returns (dispatcher.uc:153), which is rooted ABOVE admin, not at it — its
 	 * leaves come back as `/admin/…`, the same shape `pages.json` entries already have. */
-	const known = new Set(await menuPaths(page));
+	const known = new Set(await menuPaths(page, stand.id));
 	for (const p of pages) {
 		const leaf = `/${p}`;
 		if (!known.has(leaf))
 			throw new Error(`playground/capture: "${p}" is not a page in ${stand.id}'s menu`);
 	}
 
-	const menu = await page.evaluate(async () => {
-		const res = await fetch(`${window.L.env.scriptname}/admin/menu`, { credentials: 'same-origin' });
+	const menu = await page.evaluate(async (ms) => {
+		const res = await fetch(`${window.L.env.scriptname}/admin/menu`,
+			{ credentials: 'same-origin', signal: AbortSignal.timeout(ms) });
 		return res.json();
-	});
+	}, FETCH_TIMEOUT_MS).catch((e) => { throw unfetched(e, stand.id, `${stand.base}/admin/menu`); });
 	ubuspath = await page.evaluate(() => window.L.env.ubuspath);
 
 	for (const p of pages) {
@@ -289,7 +322,7 @@ async function main() {
 		const [ response ] = await Promise.all([
 			page.waitForResponse((r) => r.url() === url && r.request().resourceType() === 'document', { timeout: 30000 }),
 			page.goto(url, { waitUntil: 'load' }),
-		]);
+		]).catch((e) => { throw unreached(e, stand.id, url); });
 		await page.waitForTimeout(SETTLE_MS);
 		try {
 			/* Quiet = no same-origin request in flight AND QUIET_MS idle since the last one started or
@@ -310,6 +343,10 @@ async function main() {
 				},
 			});
 		} catch (e) {
+			/* a request a hung stand never answers holds the page open as surely as a busy poll */
+			if (!await answers(origin))
+				throw new StandDown(`${stand.id}: ${origin} stopped answering; page "${p}" ${e.message}`
+					+ ' — the stand, not the theme');
 			const missing = missingOverlayKeys(rpc, overlay);
 			throw new Error(`playground/capture: page "${p}" ${e.message}; overlay key(s) still `
 				+ `missing: ${missing.length ? missing.join(', ') : 'none'}`);
@@ -324,10 +361,15 @@ async function main() {
 	 * page load can be trusted to exercise. Fetched through the logged-in `page` so the `response`
 	 * listener above files each one under `static/` exactly like a page-triggered GET would. */
 	const iconFiles = listStaticDir(stand.id, 'resources/icons');
-	await page.evaluate(async (files) => {
-		await Promise.all(files.map((f) =>
-			fetch(`/luci-static/resources/icons/${f}`, { credentials: 'same-origin' }).catch(() => {})));
-	}, iconFiles);
+	/* One clock for the batch, the bodies read under it so a transfer that stalls is bounded too. No
+	 * catch: a fetch rejects only when nothing answered, and the icon it swallowed went unrecorded
+	 * without a word. */
+	await page.evaluate(async ([ files, ms ]) => {
+		const signal = AbortSignal.timeout(ms);
+		await Promise.all(files.map((f) => fetch(`/luci-static/resources/icons/${f}`,
+			{ credentials: 'same-origin', signal }).then((r) => r.arrayBuffer())));
+	}, [ iconFiles, FETCH_TIMEOUT_MS ])
+		.catch((e) => { throw unfetched(e, stand.id, `${origin}/luci-static/resources/icons/`); });
 	await drain('icons');
 
 	await browser.close();
@@ -361,5 +403,7 @@ async function main() {
 main().catch((e) => {
 	/* a stand that does not serve LuCI is named, not a stack: the capture is not at fault */
 	console.error(e instanceof StandDown ? e.message : String(e && e.stack || e));
-	process.exit(1);
+	/* 75 (EX_TEMPFAIL): the stand stopped answering, which the CI step restarts and records once
+	 * more; every other failure is the recording's or the theme's and fails at once. */
+	process.exit(e instanceof StandDown ? 75 : 1);
 });

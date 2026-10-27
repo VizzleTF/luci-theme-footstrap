@@ -1,0 +1,159 @@
+# Does tools/anchor-check.mjs still fail when the theme's anchoring is broken? Each job puts one
+# known-bad edit to fs-fit.js on a router (tools/anchor-mutants.mjs) and expects the check to go
+# red; a mutant the check passes is a hole in build.yml's `anchor` gate. Nothing else proves the
+# gate still sees the five regressions it was built for: an edit to the check or to fs-fit.js can
+# leave it passing everything.
+#
+# Weekly, by hand, and on a pull request that touches the check, fs-fit.js, the stand or a script
+# the job runs. Not a required check: a surviving mutant is a signal to read, not a merge gate.
+name: anchor-mutants
+
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tools/anchor-check.mjs
+      - tools/anchor-mutants.mjs
+      - tools/lib/stands.mjs
+      - tools/lib/util.mjs
+      - tools/lib/root.mjs
+      - tools/stage.sh
+      - tools/ci-stand.sh
+      - tools/ci-install.sh
+      - tools/ci-retry.sh
+      - tools/ci-playwright.sh
+      - luci-theme-footstrap/htdocs/luci-static/resources/fs-fit.js
+      - package.json
+      - package-lock.json
+      - owlab.yaml
+      - .github/workflows/anchor-mutants.yml
+
+permissions:
+  contents: read
+
+# A newer push to a pull request supersedes its run, and a re-run of an older one waits for it. The
+# weekly run and a dispatch are groups of their own, as in build.yml, so neither cancels the other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.run_attempt == '1' }}
+
+jobs:
+  mutant:
+    name: Mutant ${{ matrix.mutant }}
+    runs-on: ubuntu-24.04
+    # 60, as `anchor`: room for one more measurement on a fresh router.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        mutant: [sync-scroll, late-frame, no-correction, no-floor, no-deferred-floor]
+    # The steps up to the install are build.yml's `anchor` on owrt2512, without its RUN gate.
+    steps:
+      - uses: actions/checkout@v7
+        with: { persist-credentials: false }
+      - id: owlab
+        uses: owfeed/owlab/setup@v0.6.7
+      # The extras and compliance files owlab fetches by URL (pinned releases).
+      - id: owlabfetch
+        uses: actions/cache/restore@v6
+        with:
+          path: .owlab/cache
+          key: owlab-fetch-owrt2512-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}
+      - name: Start the router in the background
+        run: |
+          (sh tools/ci-stand.sh owrt2512; echo $? > "$RUNNER_TEMP/owlab-up.tmp" && mv "$RUNNER_TEMP/owlab-up.tmp" "$RUNNER_TEMP/owlab-up.rc") \
+            > "$RUNNER_TEMP/owlab-up.log" 2>&1 < /dev/null &
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: sh tools/ci-retry.sh 300 npm ci
+      - id: pw
+        run: |
+          {
+            echo "version=$(node -p "require('playwright/package.json').version")"
+            echo "image=$ImageOS-$ImageVersion"
+            echo "os=$ImageOS"
+          } >> "$GITHUB_OUTPUT"
+      - id: browsers
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.pw.outputs.os }}-${{ steps.pw.outputs.version }}-chromium-shell-firefox-webkit
+      # WebKit's apt libraries; keyed by the runner image, whose own packages they were resolved against
+      - id: debs
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/playwright-debs
+          key: playwright-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}-webkit
+          restore-keys: playwright-debs-${{ steps.pw.outputs.os }}-
+      - env:
+          PW_DEB_EXACT: ${{ steps.debs.outputs.cache-hit }}
+        run: PW_DEB_CACHE="$HOME/.cache/playwright-debs" sh tools/ci-playwright.sh chromium firefox webkit
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers.outputs.cache-primary-key }}
+      - if: steps.debs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/playwright-debs
+          key: ${{ steps.debs.outputs.cache-primary-key }}
+      - id: owfeedsetup
+        uses: owfeed/owfeed/setup@v0.5.6
+      - id: owfeed
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/owfeed
+          key: owfeed-${{ runner.os }}-${{ hashFiles('owfeed.lock') }}-${{ steps.owfeedsetup.outputs.version }}
+      # 8: owfeed's "upstream outage, safe to run again" (the SDK fetch); any other exit is the
+      # build's answer.
+      - timeout-minutes: 15
+        run: FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && CI_RETRY_ON=8 sh tools/ci-retry.sh 240 owfeed build
+      - if: steps.owfeed.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/owfeed
+          key: ${{ steps.owfeed.outputs.cache-primary-key }}
+      # Up to three builds on a seven-minute clock each (tools/ci-stand.sh).
+      - name: Wait for the router
+        timeout-minutes: 25
+        run: |
+          while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
+          cat "$RUNNER_TEMP/owlab-up.log"
+          exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
+      - if: steps.owlabfetch.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .owlab/cache
+          key: ${{ steps.owlabfetch.outputs.cache-primary-key }}
+      # Kept outside dist/: anchor-mutants.mjs restages it (tools/stage.sh wipes dist/), and a fresh
+      # router below needs the package again.
+      - timeout-minutes: 5
+        run: |
+          cp dist/noarch/luci-theme-footstrap-[0-9]*.apk "$RUNNER_TEMP/"
+          sh tools/ci-install.sh owrt2512 "$RUNNER_TEMP"/luci-theme-footstrap-[0-9]*.apk
+      # One mutant, then the normal build back on the router. bash on GitHub is `-eo pipefail`, so rc
+      # is node's and not tee's. The summary line is required too: an --only naming a mutant the
+      # tool no longer has picks nothing and passes 0 of 0.
+      - name: Measure the mutant
+        timeout-minutes: 35
+        shell: bash
+        run: |
+          for try in 1 2; do
+            rc=0
+            node tools/anchor-mutants.mjs --router owrt2512 --only ${{ matrix.mutant }} 2>&1 | tee "$RUNNER_TEMP/mutant.txt" || rc=$?
+            # 1 with no SURVIVED line: no verdict (the stand stopped answering, a hang, a crash).
+            # Once more on a fresh router, as `anchor` does on its exit 3; a survivor, a mutant that
+            # no longer applies (2) or a kill is the verdict.
+            if [ "$rc" -ne 1 ] || grep -q '^SURVIVED ' "$RUNNER_TEMP/mutant.txt" || [ "$try" -eq 2 ]; then break; fi
+            echo "::warning title=Mutant ${{ matrix.mutant }}::no verdict; measuring once more on a fresh router"
+            timeout -k 10 120 owlab down owrt2512 || true
+            sh tools/ci-stand.sh owrt2512
+            sh tools/ci-install.sh owrt2512 "$RUNNER_TEMP"/luci-theme-footstrap-[0-9]*.apk
+          done
+          [ "$rc" -eq 0 ] || exit "$rc"
+          grep -q '^anchor-mutants owrt2512: 1 of 1 killed$' "$RUNNER_TEMP/mutant.txt"

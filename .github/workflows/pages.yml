@@ -19,12 +19,13 @@ on:
       - 'tools/lib/tokens.mjs'
       - 'tools/lib/root.mjs'
       - 'luci-theme-footstrap/build-css.sh'
+      - 'luci-theme-footstrap/htdocs/luci-static/footstrap/logo.svg'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
-  # Called by build.yml's `pages` job once a tag's release and its playground asset are published,
-  # which is what refreshes the release mirror below. It cannot be `on: release`: an event raised by
-  # GITHUB_TOKEN does not trigger another workflow. Also called by build.yml's `pages-manual` job, a
-  # manual publish from a single run rather than a tag.
+  # Called by build.yml's `pages` job once a tag's release is published, whatever became of its
+  # playground asset, which is what refreshes the release mirror below. It cannot be `on: release`:
+  # an event raised by GITHUB_TOKEN does not trigger another workflow. Also called by build.yml's
+  # `pages-manual` job, a manual publish from a single run rather than a tag.
   workflow_call:
     inputs:
       # 'release' (default): mirror releases/latest/download/playground.tar.gz, same as a direct
@@ -36,27 +37,33 @@ on:
         type: string
         default: release
 
-# Only `deploy` takes pages/id-token write: `build` runs `npm ci`, and a token with those scopes
-# there would let a dependency publish to Pages. A caller's permissions cap these (build.yml).
+# Only `deploy` takes pages/id-token write: `build` runs the tree's own scripts, and a token with
+# those scopes there would let them publish to Pages. A caller's permissions cap these (build.yml).
 permissions:
   contents: read
 
+# A deploy that started finishes (GitHub's own Pages starter says the same): a docs push must not
+# cancel a tag's mirror refresh. The newer run waits and deploys after it.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 # Every job carries a timeout, as in build.yml: the default is six hours. A run takes under a
 # minute.
 jobs:
   build:
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    # Named by attempt: deploy-pages refuses a run holding two artifacts of one name, which
+    # "Re-run all jobs" leaves behind (actions/deploy-pages#338).
+    outputs:
+      artifact: github-pages-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
-      # 22, matching build.yml.
+        with: { persist-credentials: false }
+      # 22, matching build.yml. No `npm ci`: the portal build imports Node's built-ins alone.
       - uses: actions/setup-node@v7
         with: { node-version: '22' }
-      - run: npm ci
       - name: Build the portal
         run: |
           set -e
@@ -88,41 +95,59 @@ jobs:
       # this workflow also fires on a docs push, and a build that did not carry the release forward
       # would silently empty the mirror.
       #
-      # Fails OPEN — a repo with no manifest release yet publishes the portal without a mirror.
+      # Open on an ANSWER: no release yet, or a release that publishes no manifest (404). Closed on
+      # a FAILURE: a 5xx, a reset, a stall past the retries. Pages keeps its previous deploy, mirror
+      # included, rather than replacing it with one that has none and reporting success.
       - name: Mirror the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          if ! curl -fsSL --retry 2 -o _site/manifest.txt \
-                 "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/manifest.txt"; then
-            rm -f _site/manifest.txt
-            echo "the latest release publishes no manifest — mirror skipped"
-            exit 0
-          fi
-          curl -fsSL --retry 2 -o _site/manifest.txt.sig \
-            "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/manifest.txt.sig"
+          # get <url> <file>: prints the HTTP status, 000 when the transport failed past the
+          # retries. No -f: a 404 is an answer and is not retried; a reset or a stall is, within
+          # 150 s.
+          get() {
+            code=$(curl -sSL --connect-timeout 10 --max-time 60 --retry 4 --retry-delay 5 \
+                     --retry-all-errors --retry-max-time 150 -o "$2" -w '%{http_code}' "$1") || code=000
+            [ "$code" = 200 ] || rm -f "$2"
+            echo "$code"
+          }
+          # One tag for every file: releases/latest can move between two requests. `timeout`: gh
+          # sets no deadline of its own, and a stalled answer would hold the job to its limit.
+          for i in 1 2 3; do
+            if tag=$(timeout 30 gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>"$RUNNER_TEMP/latest.err"); then break; fi
+            if grep -q 'HTTP 404' "$RUNNER_TEMP/latest.err"; then echo "::warning::no release yet — mirror skipped"; exit 0; fi
+            [ "$i" -lt 3 ] || { cat "$RUNNER_TEMP/latest.err"; echo "::error::releases/latest did not answer — keeping the previous Pages deploy"; exit 1; }
+            sleep $((i * 10))
+          done
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag"
+          code=$(get "$base/manifest.txt" _site/manifest.txt)
+          case "$code" in
+            200) ;;
+            404) echo "::warning::$tag publishes no manifest — mirror skipped"; exit 0 ;;
+            *)   echo "::error::manifest.txt of $tag answered $code — keeping the previous Pages deploy"; exit 1 ;;
+          esac
           # The installer too: a router that cannot reach github.com cannot fetch install.sh from
           # there either, so a mirror without it leaves the user with a verified way to install and
           # no way to obtain the installer. Its signature rides along so the script can be checked
           # before it runs as root — the one link the trust chain cannot cover on its own.
-          for f in install.sh install.sh.sig; do
-            curl -fsSL --retry 2 -o "_site/$f" \
-              "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$f" || rm -f "_site/$f"
-          done
-          # Every package the manifest names, under the name the manifest gives it — the same
+          # Then every package the manifest names, under the name the manifest gives it — the same
           # string a router asks this mirror for. Reading the file list out of the manifest rather
           # than globbing the release is what keeps the two in step.
-          tag=$(awk '$1=="tag"{print $2; exit}' _site/manifest.txt)
-          awk '$1=="pkg"{print $4}' _site/manifest.txt | while read -r f; do
-            curl -fsSL --retry 2 -o "_site/$f" \
-              "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$f"
+          for f in manifest.txt.sig install.sh install.sh.sig $(awk '$1=="pkg"{print $4}' _site/manifest.txt); do
+            code=$(get "$base/$f" "_site/$f")
+            [ "$code" = 200 ] || { echo "::error::$f of $tag answered $code — keeping the previous Pages deploy"; exit 1; }
             echo "mirrored: $f ($(wc -c < "_site/$f") bytes)"
           done
+          # The bytes are the ones the signed inventory names.
+          awk '$1=="pkg"{print $6"  _site/"$4}' _site/manifest.txt | sha256sum -c --quiet - \
+            || { echo "::error::a package of $tag does not match the manifest's sha256 — keeping the previous Pages deploy"; exit 1; }
           echo "mirror of $tag complete."
 
       # The playground is recorded from a real router by build.yml's `playground` job, not built
       # here — Pages has no owlab stand. It comes from releases/latest, else from the newest
       # non-draft release carrying the asset: the latest tag can lack it (cut before the recording
-      # moved to CI, or between `release` and `playground-asset`), and a push to main must not
+      # moved to CI, or before `release` attached it to the draft), and a push to main must not
       # redeploy Pages without it. Open on "no release carries it" (`::warning::`, Pages ships
       # without); closed on a gh api or download error, so the previous deploy stays live.
       - name: Fetch the latest playground
@@ -131,21 +156,32 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          url="https://github.com/$GITHUB_REPOSITORY/releases/latest/download/playground.tar.gz"
-          if ! curl -fsSL --retry 2 -o /tmp/playground.tar.gz "$url"; then
-            tag=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq \
-              '[.[] | select(.draft | not) | select(any(.assets[]; .name == "playground.tar.gz"))][0].tag_name // empty')
-            if [ -z "$tag" ]; then
-              echo "::warning::no release carries playground.tar.gz — Pages published WITHOUT the playground"
-              exit 0
-            fi
-            curl -fsSL --retry 2 -o /tmp/playground.tar.gz \
-              "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/playground.tar.gz"
-            echo "playground from $tag (releases/latest has none)"
-          fi
+          # get <url> <file>: the mirror step's, with 120 s per transfer for the larger tarball.
+          get() {
+            code=$(curl -sSL --connect-timeout 10 --max-time 120 --retry 4 --retry-delay 5 \
+                     --retry-all-errors --retry-max-time 150 -o "$2" -w '%{http_code}' "$1") || code=000
+            [ "$code" = 200 ] || rm -f "$2"
+            echo "$code"
+          }
+          pg="$RUNNER_TEMP/playground.tar.gz"
+          code=$(get "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/playground.tar.gz" "$pg")
+          case "$code" in
+            200) ;;
+            404)
+              tag=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq \
+                '[.[] | select(.draft | not) | select(any(.assets[]; .name == "playground.tar.gz"))][0].tag_name // empty')
+              if [ -z "$tag" ]; then
+                echo "::warning::no release carries playground.tar.gz — Pages published WITHOUT the playground"
+                exit 0
+              fi
+              code=$(get "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/playground.tar.gz" "$pg")
+              [ "$code" = 200 ] || { echo "::error::playground.tar.gz of $tag answered $code — keeping the previous Pages deploy"; exit 1; }
+              echo "playground from $tag (releases/latest has none)" ;;
+            *) echo "::error::releases/latest playground.tar.gz answered $code — keeping the previous Pages deploy"; exit 1 ;;
+          esac
           mkdir -p _site/playground
-          tar -xzf /tmp/playground.tar.gz -C _site/playground
-          echo "playground: $(wc -c < /tmp/playground.tar.gz) bytes"
+          tar -xzf "$pg" -C _site/playground
+          echo "playground: $(wc -c < "$pg") bytes"
 
       # A MANUAL PUBLISH (build.yml's `pages-manual`), and it FAILS CLOSED, unlike the fetch above:
       # that step exists to preview THIS run's own recording, so falling back to the release's (or
@@ -170,22 +206,25 @@ jobs:
           printf '%s' '<!doctype html><meta http-equiv="refresh" content="0; url=playground/"><a href="playground/">Continue</a>' \
             > _site/playground.html
       - uses: actions/upload-pages-artifact@v5
-        with: { path: _site }
+        with:
+          path: _site
+          name: github-pages-${{ github.run_attempt }}
 
   deploy:
     needs: build
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write
     # `github-pages` accepts only `main` or a `v*` tag as a deployment branch (repo Settings ->
     # Environments -> github-pages; `gh api repos/…/environments/github-pages/deployment-branch-
-    # policies`, checked 2026-09-14: custom_branch_policies [main, v*]) — a `pages-manual` dispatch
-    # from any other ref reaches this job but is refused HERE, after `build` already spent its time.
+    # policies`, checked 2026-09-14: custom_branch_policies [main, v*]). A `pages-manual` dispatch
+    # from any other ref never gets here: build.yml's `playground` refuses it in its first step.
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
         uses: actions/deploy-pages@v5
+        with: { artifact_name: '${{ needs.build.outputs.artifact }}' }

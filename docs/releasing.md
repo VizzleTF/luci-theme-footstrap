@@ -42,7 +42,12 @@ job (`gh run view <id>`):
 | `e2e` | `tools/e2e.mjs` on owrt2512 (25.12/apk) and owrt2410 (24.10/opkg): install the last release, upgrade to this build, open every menu page against bootstrap, remove, fresh install ([verifying.md](verifying.md)) |
 | `anchor` | `tools/anchor-check.mjs` on owrt2512 and owrt2410, beside `e2e`: a poll tick above a parked reader in Chromium, Firefox and WebKit ([verifying.md](verifying.md)) |
 
-`playground` does not run on a push to `main`; it runs first on the tag (or a `workflow_dispatch`).
+`playground` runs on every push to `main` that reaches the package, on the tag and on a dispatch
+(`gh workflow run build.yml --ref main`); the runbook's step 0 reads it with the rest of the main
+run. A dispatch never signs a package or publishes a release. A tag cut before that rule (v0.14.16
+and older) keeps a build.yml whose `release` also runs on a dispatch, re-signs every package and
+deletes and re-uploads each asset of the published release: never pass `--ref` naming one of those
+tags.
 
 What stays local, beside reading CI:
 
@@ -212,7 +217,7 @@ goes to `../tmp/release-<v>/`.
    - scope the diff (Step 1 above says which live checks it makes mandatory) and run those rows
      plus asset selection (Steps 3 and 4) on both stands ([verifying.md](verifying.md));
    - Build's newest completed push run on `main` is `success` and is read job by job (`build`,
-     both `e2e` legs and both `anchor` legs);
+     both `e2e` legs, both `anchor` legs and `playground`);
    - `~/go/bin/owfeed lock` exits 0 at the repo root and in a fresh
      `gh repo clone owfeed/owfeed-packages ../tmp/release-<v>/feed -- --depth 1` (a stale lock
      there reds the feed's `check / build` after the tag);
@@ -225,11 +230,12 @@ goes to `../tmp/release-<v>/`.
 4. **Before the tag, read the release sha's run and the one before it on `main`**:
    `gh run list --branch main --workflow build.yml --event push -L2`. It lists Build's push runs
    only: a CodeQL or pages run is not the pipeline the tag waits on. It has no
-   `--status completed`, so the release sha's own run shows while it is still going. A run already
-   red before your push stays red after it. `release` waits for every job (step 7), so a tag pushed
-   onto a broken pipeline cannot publish. Do not push past a pre-existing failure. It is either an
-   infrastructure condition to fix first, or a real regression that has nothing to do with this
-   release but will still hold it.
+   `--status completed`, so the release sha's own run shows while it is still going. `build`
+   already generates the newest section's notes on every run, so a broken section fails the
+   release commit's main run, not the tag. A run already red before your push stays red after it.
+   `release` waits for every job (step 7), so a tag pushed onto a broken pipeline cannot publish.
+   Do not push past a pre-existing failure. It is either an infrastructure condition to fix first,
+   or a real regression that has nothing to do with this release but will still hold it.
 5. **Tag the release commit**: `git tag -a vx.y.z -m vx.y.z`, then `git push origin vx.y.z` once the
    create exited 0. The tag goes on the release commit, never first. It must point at a commit that
    already contains its own entry, or the release describes a version whose changelog does not yet
@@ -246,9 +252,15 @@ goes to `../tmp/release-<v>/`.
    - `gh run view <id>` for the job list;
    - `gh run view <id> --log-failed` for a failing step's log.
 
+   A first attempt whose every failed job failed on infrastructure alone is re-run once, on its
+   own, by `rerun-infra.yml` ([ci.md](ci.md)). On the tag that second attempt goes on to `release`,
+   as a manual re-run would. `gh run watch` ends with the first attempt; `gh run view <id>` shows
+   the newest one, `--attempt 1` the first.
+
    Say plainly whether the cause is this diff, an infrastructure condition, or an upstream feed.
    Only then check that the release carries the expected assets, plus a `.sig` for each: the theme
-   resolving to exactly one asset per format, the manifest, the installer, the notes.
+   resolving to exactly one asset per format, the manifest, the installer, the notes. Beside them
+   sits `playground.tar.gz`, which `release` attaches unsigned while the release is a draft.
 8. **Publish the feed, and do not wait on the schedule.** The theme is installed from
    owfeed-packages, so a release nobody can `apk upgrade` into is half a release. There `update.yml`
    runs `land` → `check` → `publish` on a cron GitHub thins to one run every 2-5 h. `check` pushes
