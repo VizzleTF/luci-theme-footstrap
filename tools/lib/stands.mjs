@@ -67,6 +67,18 @@ export async function sealToRouter(ctx, base) {
  * own verdict is "nothing was measured here", never a finding. */
 export class StandDown extends Error {}
 
+/* Whether owlab sees router `id` stop running (paused, stopped or gone) within 10 s. An exec its
+ * container's kill or stop cuts short fails with the command's own status (137, or 143 from procd's
+ * halt) and no word from the daemon, while docker still says running: about 0.3 s after a kill,
+ * about 3 s into a stop. A caller asks this before it calls a failed exec anything but the stand. */
+export function standStopped(id) {
+	for (let i = 1; ; i++) {
+		if (!owlabRouters().some((r) => r.id === id && r.state === 'running')) return true;
+		if (i === 10) return false;
+		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
+	}
+}
+
 /* Null when the answer is a LuCI page — the login form, or an authenticated page that loads luci.js —
  * else the sentence naming what the stand said instead, from the first line of text the browser
  * rendered (`text`, the body's innerText: the browser parses the HTML, nothing here does). A

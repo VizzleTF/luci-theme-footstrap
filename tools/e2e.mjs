@@ -28,7 +28,7 @@ import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { ROOT } from './lib/root.mjs';
-import { StandDown, login, menuPaths, stoodDown, unreached } from './lib/stands.mjs';
+import { StandDown, login, menuPaths, standStopped, stoodDown, unreached } from './lib/stands.mjs';
 import { ghData, ghProp } from './lib/util.mjs';
 
 const { values: opt } = parseArgs({ options: {
@@ -56,8 +56,8 @@ const APK = router.package_manager === 'apk';
 /* ---- the router side ---- */
 
 /* Every docker call is on a clock: a stand that stops answering ends the run red, not in the step's
- * timeout. One that never returns, or that the daemon refuses (the container paused, stopped or
- * gone), is the stand's, as in anchor-check.mjs: a StandDown. */
+ * timeout. One that never returns, that the daemon refuses (the container paused, stopped or
+ * gone), or that its container's stop cut short is the stand's, as in anchor-check.mjs: a StandDown. */
 const refused = (stderr) => (String(stderr || '').match(/^Error response from daemon.*$/m) || [ '' ])[0];
 function docker(...args) {
 	try {
@@ -65,6 +65,7 @@ function docker(...args) {
 	} catch (e) {
 		if (e.code === 'ETIMEDOUT') throw new StandDown(`${opt.router}: docker ${args[0]} did not return in 60 s`);
 		if (refused(e.stderr)) throw new StandDown(`${opt.router}: ${refused(e.stderr)}`);
+		if (standStopped(opt.router)) throw new StandDown(`${opt.router}: the router stopped during docker ${args[0]}`);
 		throw e;
 	}
 }
@@ -432,7 +433,11 @@ async function pass(name, items, list, fn, alone = new Set()) {
 			out[x.path || x] = await fn(s, x);
 		}
 	}));
-	for (const x of items.filter((x) => alone.has(x.path || x))) out[x.path || x] = await fn(list[0], x);
+	const lone = items.filter((x) => alone.has(x.path || x));
+	/* the other sessions' last views poll on, and a poll is a neighbour too; a page that cannot leave
+	 * (its renderer gone) polls nothing either */
+	if (lone.length) await Promise.all(list.slice(1).map((s) => s.page.goto('about:blank').catch(() => {})));
+	for (const x of lone) out[x.path || x] = await fn(list[0], x);
 	console.log(`  ${name}: ${items.length} in ${Math.round((Date.now() - t0) / 1000)} s`);
 	return out;
 }
@@ -459,15 +464,17 @@ async function crawl(browser, into) {
 	await closeAll(refs.slice(1));
 	/* The process_list race (below) empties the reference too, and an empty reference vouches for an
 	 * empty footstrap view (3 runs in 5 on 24.10): a view that asked for the process list is read
-	 * once more alone, and the fuller reading kept. Its errors and requests join the first's, so the
-	 * second reading takes back nothing the first vouched for. Footstrap's passes read such a view
-	 * alone from the start: among the phone pass's neighbours on 24.10 it came out empty 5 runs in 5. */
+	 * once more alone, and the fuller reading kept. Its errors, failures and requests join the
+	 * first's, so the second reading takes back nothing the first vouched for. Footstrap's passes
+	 * read such a view alone from the start: among the phone pass's neighbours on 24.10 it came out
+	 * empty 5 runs in 5. */
 	const lone = new Set(paths.filter((x) => bs[x].requested.some((k) => k.includes('"getProcessList"'))));
 	for (const p of lone) {
 		const r = await open(refs[0].page, refs[0].seen, p, { shotDir: dir('bootstrap'), span: LONG + 1000, reference: true });
 		console.log(`  again, alone: bootstrap ${p}: ${bs[p].text} -> ${r.text} characters`);
 		if (r.text > bs[p].text) bs[p] = { ...r, watched: Math.max(bs[p].watched, r.watched), rendered: bs[p].rendered || r.rendered,
-			errors: [ ...bs[p].errors, ...r.errors ], requested: [ ...new Set([ ...bs[p].requested, ...r.requested ]) ] };
+			errors: [ ...bs[p].errors, ...r.errors ], failed: [ ...bs[p].failed, ...r.failed ],
+			requested: [ ...new Set([ ...bs[p].requested, ...r.requested ]) ] };
 	}
 	await closeAll(refs.slice(0, 1));
 	setTheme('/luci-static/footstrap');

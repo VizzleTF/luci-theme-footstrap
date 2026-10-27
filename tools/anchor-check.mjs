@@ -36,7 +36,7 @@
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import * as playwright from 'playwright';
-import { StandDown, login, sealToRouter, stands, stoodDown } from './lib/stands.mjs';
+import { StandDown, login, sealToRouter, standStopped, stands, stoodDown } from './lib/stands.mjs';
 import { ghData, ghProp } from './lib/util.mjs';
 
 const { values: opt } = parseArgs({ options: {
@@ -67,10 +67,11 @@ const sh = (script, input) => {
 		return execFileSync('docker', [ 'exec', '-i', CONTAINER, 'sh', '-c', script ],
 			{ encoding: 'utf8', input, timeout: 60000, killSignal: 'SIGKILL', stdio: [ input == null ? 'ignore' : 'pipe', 'pipe', 'pipe' ] });
 	} catch (e) {
-		/* a docker exec that never returns, or one the daemon refuses (the container paused, stopped
-		 * or gone), is a stand that stopped answering, not a finding */
+		/* a docker exec that never returns, one the daemon refuses (the container paused, stopped or
+		 * gone), or one its container's stop cut short is a stand that stopped answering, not a finding */
 		if (e.code === 'ETIMEDOUT') throw new StandDown(`${stand.id}: docker exec did not return in 60 s`);
 		if (/^Error response from daemon/m.test(e.stderr || '')) throw new StandDown(`${stand.id}: ${e.stderr.trim().split('\n')[0]}`);
+		if (standStopped(stand.id)) throw new StandDown(`${stand.id}: the router stopped during docker exec`);
 		throw e;
 	}
 };
@@ -418,10 +419,17 @@ async function measure() {
 				} finally { await Promise.all(Object.values(browsers).map((b) => b.close().catch(() => {}))); }
 			}
 		}
-	} finally {
-		setTheme('footstrap');
-		shrink();
+	} catch (e) {
+		/* a stand that stopped answering refuses the cleanup too: the failure keeps its own cause, and a
+		 * view that loaded nothing on a live stand turns the stand's once the cleanup finds it gone */
+		try { setTheme('footstrap'); shrink(); } catch (c) {
+			console.log(`the cleanup after "${String(e.message).split('\n')[0]}" failed: ${c.message}`);
+			if (e.unmeasured && c instanceof StandDown) throw c;
+		}
+		throw e;
 	}
+	setTheme('footstrap');
+	shrink();
 }
 
 function judgeAll() {
