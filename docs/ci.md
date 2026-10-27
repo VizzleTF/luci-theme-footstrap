@@ -299,7 +299,10 @@ the ISO week. `e2e`, `anchor`, `playground` and `anchor-mutants` restore it, and
 it and starts it with `owlab up --no-build` (owlab 0.7.0), which fetches and builds nothing, before
 the LuCI probe above. owlab starts the image only when its `org.owlab.inputs` label matches this
 owlab and this `owlab.yaml`. A load, a start or a probe that fails leaves a `::warning` titled
-"Saved router image", and the router is built as above.
+"Saved router image", and the router is built as above. From the saved image the router is up before
+the job's other setup is done: on the pull request that brought it, `Wait for the router` went from
+48-74 s in `e2e` and 24-47 s in `anchor` to 0-2 s, and an `e2e` job from 337-369 s to 293-321 s. The
+image is 50-55 MB and restores in 1-3 s.
 
 The save comes after the leg's verdict rather than with the other caches, so a kept stand is one
 its own `e2e` passed on. `anchor` and `playground` run beside `e2e` and do not gate it: a run they
