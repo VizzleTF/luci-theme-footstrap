@@ -213,8 +213,9 @@ and the same on `owrt2410` with `luci-theme-footstrap_*_all.ipk` and
   before the first measurement or in the rerun (nothing was judged).
   In CI exit 1 is an `::error` titled `Scroll anchoring <router>`, and exit 3 one titled
   `Upstream outage (safe to rerun)`. A check that crashes (an error that is neither a finding nor
-  the stand's) exits 1 with its stack and no title of its own. CI measures once more on a fresh
-  router after a 2 or a 3.
+  the stand's) exits 1 with its stack and an `::error` titled `Scroll anchoring <router>`, like a
+  finding's, whose message starts `anchor-check crashed`.
+  CI measures once more on a fresh router after a 2 or a 3.
   There an exit other than 0 and 3 leaves `::error title=Scroll anchoring on <router>` too, so the
   first 3's title does not make the job read as an outage.
 - Whether the anchoring check can fail at all: `node tools/anchor-mutants.mjs --router owrt2512`.
