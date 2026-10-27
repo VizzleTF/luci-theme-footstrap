@@ -72,10 +72,11 @@ A page fails for what footstrap adds over bootstrap on the same page:
   reading of a footstrap view is in `report.json` (`crawl.again`). The race empties the reference
   too, and an empty reference passes an empty footstrap view (3 runs in 5 on 24.10). So every
   reference view whose requests include `getProcessList` is read once more alone after the
-  bootstrap pass, and the fuller reading is kept, with the errors and requests of both: the second
-  reading takes back nothing the first vouched for. The log prints it as `again, alone: bootstrap`.
-  The desktop and phone passes read each such view after the rest of the pass, alone from the
-  start: among the phone pass's neighbours on 24.10 it came out empty in 5 runs out of 5;
+  bootstrap pass, and the fuller reading is kept, with the errors, failed requests and requests of
+  both: the second reading takes back nothing the first vouched for. The log prints it as
+  `again, alone: bootstrap`. The desktop and phone passes read each such view after the rest of
+  the pass, alone from the start, with the other sessions moved off LuCI so their views stop
+  polling: among the phone pass's neighbours on 24.10 it came out empty in 5 runs out of 5;
 - a broken footstrap shell, checked at 1280 and at 390 px. The stylesheet (`link[data-fs-shell]`)
   holds fewer than 500 rules (the shipped sheet holds about 1000). `--primary-color-high` does not
   resolve on `:root`. The menu column (`nav[data-fs-chrome]`) is not visible with a box of its own.
@@ -199,16 +200,21 @@ and the same on `owrt2410` with `luci-theme-footstrap_*_all.ipk` and
   same six pages' load. When every failure is a cell that measured nothing, the whole check runs
   once more (the log says `MEASURED NOTHING` first, in a `::warning` line CI shows as an
   annotation). A stand that stops answering mid-measure (no answer to a navigation or the login
-  while LuCI's root stays silent for a minute, or a `docker exec` that does not return in 60 s or
-  that Docker refuses) counts as such a run, and the rerun first waits up to a minute for LuCI. A
-  navigation that times out while the root answers measured nothing too, but is no outage: theme
-  code that holds the load in WebKit or Firefox, which only this check runs, fails as a finding
-  when the rerun meets it again. Every measurement starts from the leases the run
-  found, whatever the last one left on the router. A failure that measured something is never
-  rerun. Exit 0 on a pass, 1 on a failure, 2 when the router is not running or has no lease, 3 when
-  the stand stopped answering before the first measurement or in the rerun (nothing was judged).
+  while LuCI's root stays silent for a minute, or a `docker exec` that does not return in 60 s,
+  that Docker refuses, or that its container's stop cuts short) counts as such a run, and the
+  rerun first waits up to a minute for LuCI. A navigation that times out while the root answers
+  measured nothing too, but is no outage: theme code that holds the load in WebKit or Firefox,
+  which only this check runs, fails as a finding when the rerun meets it again. Every measurement
+  starts from the leases the run found, whatever the last one left on the router. A measurement
+  that fails puts footstrap and the leases back; when a stopped stand refuses that too, the
+  failure keeps its own cause, and only a navigation that timed out while the root answered
+  becomes the stand's. A failure that measured something is never rerun. Exit 0 on a pass, 1 on a
+  failure, 2 when the router is not running or has no lease, 3 when the stand stopped answering
+  before the first measurement or in the rerun (nothing was judged).
   In CI exit 1 is an `::error` titled `Scroll anchoring <router>`, and exit 3 one titled
-  `Upstream outage (safe to rerun)`. CI measures once more on a fresh router after a 2 or a 3.
+  `Upstream outage (safe to rerun)`. A check that crashes (an error that is neither a finding nor
+  the stand's) exits 1 with its stack and no title of its own. CI measures once more on a fresh
+  router after a 2 or a 3.
   There an exit other than 0 and 3 leaves `::error title=Scroll anchoring on <router>` too, so the
   first 3's title does not make the job read as an outage.
 - Whether the anchoring check can fail at all: `node tools/anchor-mutants.mjs --router owrt2512`.
@@ -246,8 +252,9 @@ of opening it. In CI each failed step is also an error annotation on the run, an
 summary lists its failed steps and failing pages (300 rows at most). A step the stand failed is
 annotated at the run's end instead: a crawl the stand stopped (step 4 above says when); LuCI's root
 silent before the removal, and silent after it only when it was silent before it too; a
-`docker exec` or `docker cp` that did not return in 60 s, or any docker call the daemon refused
-(the container paused, stopped or gone), which ends the crawl or the run there. Silent means no
+`docker exec` or `docker cp` that did not return in 60 s, any docker call the daemon refused
+(the container paused, stopped or gone), or one that failed while the router stopped within 10 s,
+which ends the crawl or the run there. Silent means no
 whole answer within 15 s (refused, cut off or none): a root that answered in full with anything
 but its form is a finding. A package manager that does not return in 120 s is a finding: a package
 script may hang. When every failed step is one the stand failed, on the run's first attempt, the

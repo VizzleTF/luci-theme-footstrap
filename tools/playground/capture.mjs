@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import { stands, login, menuPaths, sealToRouter, requireStands, StandDown, unreached } from '../lib/stands.mjs';
+import { stands, login, menuPaths, sealToRouter, requireStands, standStopped, StandDown, unreached } from '../lib/stands.mjs';
 import {
 	splitBatch, parseLsLines, waitForQuiet, drainReads, missingOverlayKeys,
 	createActivityTracker, createGenerationGate, describePendingRequest, describePendingRequests,
@@ -95,14 +95,16 @@ function listStaticDir(standId, dir) {
 			{ encoding: 'utf8', timeout: 60000 });
 		return parseLsLines(out);
 	} catch (e) {
-		/* an exec that never returns, or one the daemon refuses (the container paused, stopped or
-		 * gone; `owlab exec` passes docker's stderr through), is the stand, as in anchor-check.mjs's
-		 * sh(); a failed `ls` stays loud */
+		/* an exec that never returns, one the daemon refuses (the container paused, stopped or gone;
+		 * `owlab exec` passes docker's stderr through), or one its container's stop cut short is the
+		 * stand, as in anchor-check.mjs's sh(); a failed `ls` stays loud */
 		const refused = String(e.stderr || '').match(/^Error response from daemon.*$/m);
 		if (e.code === 'ETIMEDOUT')
 			throw new StandDown(`${standId}: owlab exec did not return in 60 s — the stand, not the theme`);
 		if (refused)
 			throw new StandDown(`${standId}: ${refused[0]} — the stand, not the theme`);
+		if (standStopped(standId))
+			throw new StandDown(`${standId}: the router stopped during owlab exec — the stand, not the theme`);
 		throw new Error(`playground/capture: could not list /www/luci-static/${dir} on ${standId}: ${e.message}`);
 	}
 }

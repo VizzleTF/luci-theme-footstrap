@@ -346,7 +346,8 @@ can open with no router behind it. Three scripts, `tools/playground/`:
    menu. A capture whose stand stopped answering exits 75: no answer to the login, a page, a
    fetch or LuCI's menu tree; a page that never went quiet, or a response it could not read, while
    uhttpd did not answer a `HEAD` for `luci.js` in 10 s either; or an `owlab exec` that did not
-   return in 60 s or that the Docker daemon refused. The step records once more on a fresh router
+   return in 60 s, that the Docker daemon refused, or that failed while the router stopped within
+   10 s. The step records once more on a fresh router
    then. A second 75 leaves
    `::error title=Upstream outage (safe to rerun)`; any other exit is the recording's or the
    theme's.
