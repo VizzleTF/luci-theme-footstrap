@@ -654,7 +654,7 @@ if (down.length && process.env.GITHUB_ACTIONS) {
  * a step, and a broken theme fails hundreds of pages. Output only, so a summary that cannot be
  * written changes no verdict; the rows stop at 300, far under the summary's 1 MiB. */
 if (failed && process.env.GITHUB_STEP_SUMMARY) {
-	const cell = (s) => String(s).replace(/\s+/g, ' ').replace(/\|/g, '\\|').replace(/</g, '&lt;');
+	const cell = (s) => String(s).replace(/\s+/g, ' ').replace(/[\\|]/g, '\\$&').replace(/&/g, '&amp;').replace(/</g, '&lt;');
 	const rows = (report.crawl?.pages || []).flatMap((x) => x.problems.map((pr) => `| ${x.how} | ${cell(x.path)} | ${cell(pr)} |`));
 	const md = [ `### e2e on ${opt.router}: ${results.length - failed}/${results.length} passed`, '',
 		...results.filter((r) => !r.ok).map((r) => `- ${cell(r.step)}${r.detail ? `: ${cell(r.detail)}` : ''}`), '',
