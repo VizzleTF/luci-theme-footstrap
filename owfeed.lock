@@ -46,8 +46,8 @@ releases:
         - riscv64_riscv64
         - x86_64
     - line: "25.12"
-      point: 25.12.5
-      source: https://downloads.openwrt.org/releases/25.12.5/packages/
+      point: 25.12.6
+      source: https://downloads.openwrt.org/releases/25.12.6/packages/
       arches:
         - aarch64_cortex-a53
         - aarch64_cortex-a72
@@ -85,5 +85,5 @@ releases:
         - riscv64_generic
         - x86_64
 toolchain:
-    sdk-release: 25.12.5
+    sdk-release: 25.12.6
     apk-tools: ""
