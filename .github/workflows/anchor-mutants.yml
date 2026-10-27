@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - id: owlab
-        uses: owfeed/owlab/setup@v0.6.7
+        uses: owfeed/owlab/setup@v0.7.0
       # The extras and compliance files owlab fetches by URL (pinned releases).
       - id: owlabfetch
         uses: actions/cache/restore@v6

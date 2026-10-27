@@ -295,11 +295,11 @@ log and fails with its exit status.
 
 A router this week's green `e2e` already built is not built again. Once its leg passes, `e2e` saves
 the router's image with `docker save` under a key of the router, `owlab.yaml`, owlab's version and
-the ISO week. `e2e`, `anchor`, `playground` and `anchor-mutants` restore it, and `ci-stand.sh`
-loads it and starts it with `owlab up --no-build`, which fetches and builds nothing, before the
-LuCI probe above. owlab starts the image only when its `org.owlab.inputs` label matches this owlab
-and this `owlab.yaml`. A load, a start or a probe that fails leaves a `::warning` titled "Saved
-router image", and the router is built as above.
+the ISO week. `e2e`, `anchor`, `playground` and `anchor-mutants` restore it, and `ci-stand.sh` loads
+it and starts it with `owlab up --no-build` (owlab 0.7.0), which fetches and builds nothing, before
+the LuCI probe above. owlab starts the image only when its `org.owlab.inputs` label matches this
+owlab and this `owlab.yaml`. A load, a start or a probe that fails leaves a `::warning` titled
+"Saved router image", and the router is built as above.
 
 The save comes after the leg's verdict rather than with the other caches, so a kept stand is one
 its own `e2e` passed on. `anchor` and `playground` run beside `e2e` and do not gate it: a run they

@@ -159,7 +159,7 @@ jobs:
           echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
         id: owlab
-        uses: owfeed/owlab/setup@v0.6.7
+        uses: owfeed/owlab/setup@v0.7.0
       # The extras and compliance files owlab fetches by URL (pinned releases): a GitHub hiccup on
       # any of them failed the build of the router. owlab fetches only the router it builds, so the
       # key names the router.
@@ -319,7 +319,7 @@ jobs:
           echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
         id: owlab
-        uses: owfeed/owlab/setup@v0.6.7
+        uses: owfeed/owlab/setup@v0.7.0
       - if: env.RUN == 'true'
         id: owlabfetch
         uses: actions/cache/restore@v6
@@ -488,7 +488,7 @@ jobs:
           echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
         id: owlab
-        uses: owfeed/owlab/setup@v0.6.7
+        uses: owfeed/owlab/setup@v0.7.0
       - if: env.RUN == 'true'
         id: owlabfetch
         uses: actions/cache/restore@v6

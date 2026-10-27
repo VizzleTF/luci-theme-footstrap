@@ -33,7 +33,7 @@ luci() {
 # answering, the router is built below.
 img="$HOME/.cache/owlab-stand/$r.tar"
 if [ -f "$img" ]; then
-	if timeout -k 10 120 docker load -q -i "$img" && timeout -k 30 300 owlab up --no-build "$r" && luci; then
+	if timeout -k 10 120 docker load -q -i "$img" && timeout -k 30 180 owlab up --no-build "$r" && luci; then
 		exit 0
 	fi
 	echo "::warning title=Saved router image::$r did not come up from $img; building it"
