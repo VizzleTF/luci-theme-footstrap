@@ -293,6 +293,27 @@ leave an `::error` titled "The router did not come up (infrastructure, not the t
 two titles `rerun-infra` re-runs a run by. The `Wait for the router` step before the run prints its
 log and fails with its exit status.
 
+A router this week's green `e2e` already built is not built again. Once its leg passes, `e2e` saves
+the router's image with `docker save` under a key of the router, `owlab.yaml`, owlab's version and
+the ISO week. `e2e`, `anchor`, `playground` and `anchor-mutants` restore it, and `ci-stand.sh` loads
+it and starts it with `owlab up --no-build` (owlab 0.7.0), which fetches and builds nothing, before
+the LuCI probe above. owlab starts the image only when its `org.owlab.inputs` label matches this
+owlab and this `owlab.yaml`. A load, a start or a probe that fails leaves a `::warning` titled
+"Saved router image", and the router is built as above. The image is 50-55 MB and restores in 1-3 s,
+and the router it starts answers before the job's other setup is done: `Wait for the router` takes
+0-2 s, where a build keeps `e2e` waiting 45-75 s.
+
+The save comes after the leg's verdict rather than with the other caches, so a kept stand is one
+its own `e2e` passed on. `anchor` and `playground` run beside `e2e` and do not gate it: a run they
+turn red can still save the stand. Their retries on a fresh router, and `anchor-mutants`', delete
+the restored image first, so the fresh router is built. A router built from the rootfs tarball,
+because the registry did not answer, is not saved: `owlab up --no-build` would refuse it all week.
+A saved key is never replaced, so a stand is served until the key changes: `owlab.yaml`, owlab's
+version or the week. It keeps the feed packages it was built with for that long. The theme is
+installed fresh on every run, and each job starts a new container, so the router's first boot runs
+as after a build. A pull request's run restores what that pull request or `main` saved: GitHub's
+cache scopes.
+
 The browsers (`~/.cache/ms-playwright`), owfeed's SDK (`~/.cache/owfeed`) and owlab's URL-keyed
 downloads (`.owlab/cache`) come from `actions/cache`. The SDK is keyed by `owfeed.lock` and
 owfeed's version. owfeed 0.5.6 checks a cached SDK against files 0.5.5 did not keep, and a cache

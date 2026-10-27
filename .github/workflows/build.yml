@@ -124,13 +124,13 @@ jobs:
   # installing it over the last release is an upgrade by both package managers' rules. Its payload
   # differs from `build`'s only in the version fs-version.js carries.
   #
-  # The router is built in the background while the browsers and the package are fetched and packed,
-  # and waited for before the run. Every step after the first is gated on RUN: a change that touches
-  # documentation alone passes without a router (tools/ci-package-changed.sh says why the steps skip
-  # and not the job).
+  # The router starts in the background, from the image a green e2e saved this week or built, while
+  # the browsers and the package are fetched and packed, and is waited for before the run. Every
+  # step after the first is gated on RUN: a change that touches documentation alone passes without a
+  # router (tools/ci-package-changed.sh says why the steps skip and not the job).
   #
   # Each cache is saved right after the step that fills it, not at the job's end: a leg that goes
-  # red later still keeps what it downloaded.
+  # red later still keeps what it downloaded. The router's image is the one saved after the verdict.
   e2e:
     name: The package's life on ${{ matrix.router }}
     timeout-minutes: 60
@@ -159,7 +159,7 @@ jobs:
           echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
         id: owlab
-        uses: owfeed/owlab/setup@v0.6.7
+        uses: owfeed/owlab/setup@v0.7.0
       # The extras and compliance files owlab fetches by URL (pinned releases): a GitHub hiccup on
       # any of them failed the build of the router. owlab fetches only the router it builds, so the
       # key names the router.
@@ -169,6 +169,19 @@ jobs:
         with:
           path: .owlab/cache
           key: owlab-fetch-${{ matrix.router }}-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}
+      # The router image a green e2e saved this week (its last steps, below), which
+      # tools/ci-stand.sh starts as it is: building one is about a minute of downloads from
+      # downloads.openwrt.org, ghcr.io and GitHub. The week bounds how long a stand keeps the feed
+      # packages it was built with; another owlab.yaml or owlab is another image at once.
+      - if: env.RUN == 'true'
+        id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+      - if: env.RUN == 'true'
+        id: stand
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/owlab-stand
+          key: owlab-stand-${{ matrix.router }}-${{ runner.arch }}-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}-${{ steps.week.outputs.week }}
       - if: env.RUN == 'true'
         name: Start the router in the background
         run: |
@@ -232,7 +245,8 @@ jobs:
           while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
           cat "$RUNNER_TEMP/owlab-up.log"
           exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
-      - if: env.RUN == 'true' && steps.owlabfetch.outputs.cache-hit != 'true'
+      # Only after a build: a router started from the saved image fetched nothing.
+      - if: env.RUN == 'true' && steps.owlabfetch.outputs.cache-hit != 'true' && hashFiles('.owlab/cache/**') != ''
         uses: actions/cache/save@v6
         with:
           path: .owlab/cache
@@ -241,6 +255,32 @@ jobs:
         timeout-minutes: 15
         run: node tools/e2e.mjs --router ${{ matrix.router }} --old old/${{ matrix.old }} --new ${{ matrix.new }} --out "$RUNNER_TEMP/e2e" --no-anchor
         shell: bash -O nullglob -e {0}
+      # The router image for the week's next runs, saved after this leg's verdict and not with the
+      # other caches: a stand kept is one this e2e passed on. anchor and playground run beside it
+      # and do not gate the save; their retries on a fresh router build one. A router built from the
+      # rootfs tarball (the registry did not answer) is not saved: `owlab up --no-build` refuses an
+      # image of other inputs, and every run of the week would load it only to build. The verdict is
+      # in by now, so a save that fails is a warning.
+      - if: env.RUN == 'true' && steps.stand.outputs.cache-hit != 'true'
+        id: standsave
+        run: |
+          if grep -q 'from the rootfs tarball' "$RUNNER_TEMP/owlab-up.log"; then
+            echo "::warning title=Saved router image::${{ matrix.router }} was built from the rootfs tarball; not saved"
+            exit 0
+          fi
+          mkdir -p "$HOME/.cache/owlab-stand"
+          tar="$HOME/.cache/owlab-stand/${{ matrix.router }}.tar"
+          if timeout -k 10 300 docker save -o "$tar" "owlab-$(timeout -k 10 60 owlab status -json | jq -r .project)-${{ matrix.router }}:latest"; then
+            echo "saved=true" >> "$GITHUB_OUTPUT"
+          else
+            rm -f "$tar"
+            echo "::warning title=Saved router image::docker save failed; the next run builds ${{ matrix.router }}"
+          fi
+      - if: steps.standsave.outputs.saved == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/owlab-stand
+          key: ${{ steps.stand.outputs.cache-primary-key }}
       - if: failure() && env.RUN == 'true'
         run: sh tools/ci-stand-state.sh ${{ matrix.router }} "$RUNNER_TEMP/e2e/stand.txt"
       - if: always() && env.RUN == 'true'
@@ -279,13 +319,23 @@ jobs:
           echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
         id: owlab
-        uses: owfeed/owlab/setup@v0.6.7
+        uses: owfeed/owlab/setup@v0.7.0
       - if: env.RUN == 'true'
         id: owlabfetch
         uses: actions/cache/restore@v6
         with:
           path: .owlab/cache
           key: owlab-fetch-${{ matrix.router }}-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}
+      # e2e's saved router image, as there.
+      - if: env.RUN == 'true'
+        id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+      - if: env.RUN == 'true'
+        id: stand
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/owlab-stand
+          key: owlab-stand-${{ matrix.router }}-${{ runner.arch }}-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}-${{ steps.week.outputs.week }}
       - if: env.RUN == 'true'
         name: Start the router in the background
         run: |
@@ -360,7 +410,8 @@ jobs:
           while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
           cat "$RUNNER_TEMP/owlab-up.log"
           exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
-      - if: env.RUN == 'true' && steps.owlabfetch.outputs.cache-hit != 'true'
+      # Only after a build: a router started from the saved image fetched nothing.
+      - if: env.RUN == 'true' && steps.owlabfetch.outputs.cache-hit != 'true' && hashFiles('.owlab/cache/**') != ''
         uses: actions/cache/save@v6
         with:
           path: .owlab/cache
@@ -369,7 +420,8 @@ jobs:
         timeout-minutes: 5
         run: sh tools/ci-install.sh ${{ matrix.router }} ${{ matrix.new }}
       # bash on GitHub is `-eo pipefail`, so rc is node's and not tee's. `owlab down` before
-      # ci-stand.sh: `owlab up` keeps a running container, hung or not.
+      # ci-stand.sh: `owlab up` keeps a running container, hung or not. The saved image goes first:
+      # it may be what stopped answering, so the fresh router is built.
       - if: env.RUN == 'true'
         name: Measure scroll anchoring
         timeout-minutes: 35
@@ -394,6 +446,7 @@ jobs:
             echo "::warning title=Scroll anchoring on ${{ matrix.router }}::anchor-check exited $rc, which judged nothing; measuring once more on a fresh router"
             sh tools/ci-stand-state.sh ${{ matrix.router }} "$RUNNER_TEMP/anchor/stand-try$try.txt"
             timeout -k 10 120 owlab down ${{ matrix.router }} || true
+            rm -f "$HOME/.cache/owlab-stand/${{ matrix.router }}.tar"
             sh tools/ci-stand.sh ${{ matrix.router }}
             sh tools/ci-install.sh ${{ matrix.router }} ${{ matrix.new }}
           done
@@ -435,13 +488,23 @@ jobs:
           echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
         id: owlab
-        uses: owfeed/owlab/setup@v0.6.7
+        uses: owfeed/owlab/setup@v0.7.0
       - if: env.RUN == 'true'
         id: owlabfetch
         uses: actions/cache/restore@v6
         with:
           path: .owlab/cache
           key: owlab-fetch-owrt2512-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}
+      # e2e's saved router image, as there.
+      - if: env.RUN == 'true'
+        id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+      - if: env.RUN == 'true'
+        id: stand
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/owlab-stand
+          key: owlab-stand-owrt2512-${{ runner.arch }}-${{ hashFiles('owlab.yaml') }}-${{ steps.owlab.outputs.version }}-${{ steps.week.outputs.week }}
       - if: env.RUN == 'true'
         name: Start the router in the background
         run: |
@@ -487,7 +550,8 @@ jobs:
           while [ ! -f "$RUNNER_TEMP/owlab-up.rc" ]; do sleep 2; done
           cat "$RUNNER_TEMP/owlab-up.log"
           exit "$(cat "$RUNNER_TEMP/owlab-up.rc")"
-      - if: env.RUN == 'true' && steps.owlabfetch.outputs.cache-hit != 'true'
+      # Only after a build: a router started from the saved image fetched nothing.
+      - if: env.RUN == 'true' && steps.owlabfetch.outputs.cache-hit != 'true' && hashFiles('.owlab/cache/**') != ''
         uses: actions/cache/save@v6
         with:
           path: .owlab/cache
@@ -501,14 +565,16 @@ jobs:
         run: |
           set -eu
           PG="$RUNNER_TEMP/playground"
-          # 75: the stand stopped answering (capture.mjs). A fresh router and one more recording;
-          # any other exit is the recording's or the theme's and fails here.
+          # 75: the stand stopped answering (capture.mjs). A fresh router, built rather than started
+          # from the saved image, and one more recording; any other exit is the recording's or the
+          # theme's and fails here.
           rc=0; node tools/playground/capture.mjs --recording "$PG/recording" || rc=$?
           if [ "$rc" -eq 75 ]; then
             echo "::warning title=Playground::the stand stopped answering; recording once more on a fresh router"
             sh tools/ci-stand-state.sh owrt2512 "$RUNNER_TEMP/playground-stand/stand-try1.txt"
             rm -rf "$PG/recording"
             timeout -k 10 120 owlab down owrt2512 || true
+            rm -f "$HOME/.cache/owlab-stand/owrt2512.tar"
             sh tools/ci-stand.sh owrt2512
             sh tools/ci-install.sh owrt2512 dist/noarch/luci-theme-footstrap-[0-9]*.apk --activate
             rc=0; node tools/playground/capture.mjs --recording "$PG/recording" || rc=$?

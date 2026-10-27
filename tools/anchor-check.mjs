@@ -49,6 +49,15 @@ if (!opt.router) {
 	console.error('usage: node tools/anchor-check.mjs --router <id> [--engines list] [--widths list] [--rows n]');
 	process.exit(2);
 }
+/* A crash, an error neither a finding nor the stand's, is red for a person like a finding: it says
+ * so under the finding's title, which CI never re-runs a run by */
+process.on('uncaughtException', (e) => {
+	console.error(e);
+	/* an exec's own words end its stderr; Playwright's cause opens its message, its call log follows */
+	const why = e?.stderr ? String(e.stderr).split('\n').filter(Boolean).slice(-3).join(' | ') : String(e?.message || e).split('\n')[0];
+	console.log(`::error title=${ghProp(`Scroll anchoring ${opt.router}`)}::${ghData(`anchor-check crashed: ${why.replace(/\x1b\[[0-9;]*m/g, '')}`)}`);
+	process.exit(1);
+});
 const [ stand ] = stands(opt.router);
 /* on a clock, SIGKILL: owlab catches TERM (signal.NotifyContext in its main) */
 const status = JSON.parse(execFileSync('owlab', [ 'status', '-json' ], { encoding: 'utf8', timeout: 60000, killSignal: 'SIGKILL' }));
