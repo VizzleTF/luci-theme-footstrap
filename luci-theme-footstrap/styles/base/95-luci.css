@@ -237,8 +237,14 @@
 	.network-status-table .ifacebox-body .ifacebadge {
 		flex: 1;
 		padding: var(--fs-space-1);
-		min-width: 220px;
+		/* capped at the field: 220px and an unbroken IPv6 ran a modal's Status badge 215px past its field at 360px */
+		min-width: min(220px, 100% - 2 * var(--fs-space-1));
 		margin: var(--fs-space-1);
+	}
+
+	.ifacebadge.large > * {
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.network-status-table .ifacebox-body .ifacebadge {

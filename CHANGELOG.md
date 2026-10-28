@@ -1,3 +1,10 @@
+## [Unreleased]
+
+### Fixed
+
+- **Opening a ComboButton menu (the Wi-Fi client's Disconnect) no longer turns the table into cards.** Since 0.14.17 the open list reached past the table's edge, and the theme read that as a table too wide for the page.
+- **The Status badge in an interface's settings stays inside the dialog on a phone.** A long IPv6 address did not wrap, and the badge ran past the card's edge.
+
 ## [0.14.17] — 2026-10-27
 
 ### Added

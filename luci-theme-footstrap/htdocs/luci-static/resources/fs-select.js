@@ -322,6 +322,8 @@ function markTokenCells(t) {
 	});
 }
 
+const OPEN_LIST = '.cbi-dropdown[open]';
+
 function fitTables() {
 	let cw;
 	document.querySelectorAll(stackables()).forEach((t) => {
@@ -353,6 +355,13 @@ function fitTables() {
 		const shape = shapeOf(t);
 
 		if (known) applyDecision(t, known);
+
+		/* an open list is out of flow yet widens `scrollWidth` (75-245px past the room on Wireless'
+		 * Disconnect): the table carded under the pointer. It holds its answer until the list closes. */
+		if (t.querySelector(OPEN_LIST)) {
+			t.classList.add('fs-fitted');
+			return;
+		}
 
 		const room = Math.round(fit.roomFor(t));
 		if (!(room > 0)) {
@@ -442,6 +451,7 @@ function unreach(t) {
 function fitScrollables() {
 	if (fit.scrolling()) { fit.deferMeasurement(); return; }
 	document.querySelectorAll(scrollables()).forEach((t) => {
+		if (t.querySelector(OPEN_LIST)) return;	/* see fitTables() */
 		const was = t.classList.contains('fs-xscroll');
 		const wasStack = t.classList.contains('fs-rowstack');
 		t.classList.remove('fs-xscroll', 'fs-rowstack');
