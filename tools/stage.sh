@@ -7,11 +7,11 @@
 #
 # `owfeed build` packages a DIRECTORY; it does not build one, and it compiles the .po files itself
 # (byte-identical to po2lmo). Everything else the SDK did happens here, in the order below: 1 copy
-# (luci.mk's install mapping), 2 build-css, 3 mangle the private --fs-* names, 4 uglify-js, 5 strip
+# (luci.mk's install mapping), 2 build-css and lightningcss, 3 mangle the private --fs-* names, 4 uglify-js, 5 strip
 # templates, minify the pre-paint scripts inside them, strip shell and assets, 6 stamp FS_VERSION
 # after the minify (minify-js.mjs keeps that declaration verbatim so the sed still matches). Those
-# are the Makefile's Build/Prepare steps plus two minifiers (uglify-js over resources,
-# minify-prepaint over head.ut).
+# are the Makefile's Build/Prepare steps plus three minifiers (lightningcss over the sheet, uglify-js over
+# resources, minify-prepaint over head.ut).
 # The lifecycle scripts are EXTRACTED from the Makefile, not kept as a second copy; `$$` is make's
 # escaping for a literal `$`, undone here.
 set -eu
@@ -60,12 +60,19 @@ if [ "$DEV" = 1 ]; then
 	"$SRC/build-css.sh" "$CSS" --dev
 else
 	"$SRC/build-css.sh" "$CSS"
+	#    lightningcss then shortens what the awk squeeze cannot (colour and value forms, merged
+	#    longhands) at the browser floor's targets, before the names are mangled.
+	node "$ROOT/tools/minify-css.mjs" "$CSS"
+	#    then folds rules that share a selector prefix into nested rules (relaxed nesting, the floor).
+	node "$ROOT/tools/nest-css.mjs" "$CSS"
 
 	# 3. The private --fs-* tier, renamed to one- and two-letter names in the sheet AND in the staged
 	#    JS and templates, with the same map. Safe only because every `--fs-` reference there is a
 	#    WHOLE string literal (docs/package.md); a composed one would ask for a name that no longer
 	#    exists. The staged copies are rewritten, never $SRC.
 	"$SRC/mangle-tokens.sh" "$CSS" "$STAGE/www/luci-static/resources" "$STAGE/usr/share/ucode/luci"
+	#    and the theme's own .fs-* class names, the same way (KEEP and the safety list: the script).
+	"$SRC/mangle-classes.sh" "$CSS" "$STAGE/www/luci-static/resources" "$STAGE/usr/share/ucode/luci"
 
 	# 4. uglify-js. On the SDK path this was optional (luci.mk's jsmin was the fallback for a
 	#    buildbot with no node); there is no jsmin here, so it is the only minifier and a

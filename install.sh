@@ -281,7 +281,7 @@ install_from_release() {
 
 # --- the catalogue for the language this router is set to ---------------------------------------
 # Reads `luci.main.lang` and fetches `luci-i18n-footstrap-<lang>`, best effort — no package can read
-# that uci value, so installing the theme alone never pulls it in. docs/package.md, "The catalogue".
+# that uci value, so installing the theme alone never pulls it in. docs/package.md, "Translations".
 install_language() {
 	_lang=$(uci -q get luci.main.lang 2>/dev/null || true)
 	case "$_lang" in
@@ -571,7 +571,7 @@ ensure_first() {	# <file> <exact-line> -> sets $FEED_PLACEMENT; returns 0/1
 # comes back unupgradable. The repository line itself needs no entry — customfeeds is a conffile of
 # the manager (`apk-mbedtls`/`opkg`), and sysupgrade backs up every conffile whose checksum moved.
 
-# Both package managers' setup is the same four steps with a different file/line shape — disable
+# Both package managers' setup is the same two steps with a different file/line shape — disable
 # every other line naming us (R3), then put ours first (R2). docs/package.md, "install.sh".
 feed_setup() {
 	if [ "$PM" = apk ]; then
@@ -629,14 +629,12 @@ feed_setup || exit 1
 # A failed fetch is loud and fatal here, not left to a silent `set -e` exit behind an unrelated
 # "Feed added" — see docs/package.md, "install.sh".
 if [ "$PM" = apk ]; then
-	mkdir -p /etc/apk/keys /lib/upgrade/keep.d
 	fetch "$FEED_HOST/owfeed-packages.pem" /etc/apk/keys/owfeed-packages.pem || {
 		err "Could not fetch the verification key from $FEED_HOST/owfeed-packages.pem."
 		exit 1
 	}
 	printf '%s\n' /etc/apk/keys/owfeed-packages.pem > /lib/upgrade/keep.d/owfeed-packages
 else
-	mkdir -p /etc/opkg/keys /lib/upgrade/keep.d
 	fetch "$FEED_HOST/$FEED_KEY_OPKG" "/etc/opkg/keys/$FEED_KEY_OPKG" || {
 		err "Could not fetch the verification key from $FEED_HOST/$FEED_KEY_OPKG."
 		exit 1

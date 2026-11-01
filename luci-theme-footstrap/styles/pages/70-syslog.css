@@ -16,10 +16,10 @@
 	}
 
 	/* disjoint tiers, not base+override — neither out-specifies the other, docs/css.md above */
-	@container fs-view (width > 560px) {
+	@container fs-view (width > 35rem) {
 		#content_syslog > div:has(> label) > input:not([type]) { flex: 1 1 12rem; }
 	}
-	@container fs-view (width <= 560px) {
+	@container fs-view (width <= 35rem) {
 		#content_syslog > div:has(> label) > :is(select, input:not([type="checkbox"])) {
 			flex-basis: 100%;
 		}
@@ -29,11 +29,8 @@
 	#syslog {
 		width: 100%;
 		min-height: 500px;
-		color: var(--fs-text);
 		margin-bottom: var(--fs-space-4);
-		font-family: var(--fs-font-mono);
 		font-size: var(--fs-type);
-		line-height: var(--fs-leading);
 		white-space: pre;
 		resize: vertical;
 	}

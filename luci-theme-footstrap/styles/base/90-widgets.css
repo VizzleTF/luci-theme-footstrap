@@ -110,9 +110,4 @@
 	}
 
 	/* .label pill and the indicator pill: theme/35-alerts.css / theme/20-shell.css — absorbed. */
-	header [data-indicator] {
-		white-space: nowrap;
-		text-shadow: none;
-		margin-block: var(--fs-space-1); margin-inline: var(--fs-space-1) 0;
-	}
 }

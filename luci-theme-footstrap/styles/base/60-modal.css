@@ -2,8 +2,7 @@
 	/* the modal overlay ui.js shows for config diffs, uploads and login */
 	#modal_overlay {
 		position: fixed;
-		top: 0;
-		bottom: 0;
+		inset-block: 0;
 		background: var(--fs-scrim);
 		z-index: var(--fs-z-overlay);
 		overflow: auto;
@@ -16,12 +15,12 @@
 		width: 90%;
 		margin: var(--fs-space-6) auto; /* clear of the sticky bar, and centred */
 		min-height: var(--fs-control-h);
-		max-width: 600px;
+		max-width: 37.5rem;
 		border-radius: var(--fs-radius-lg); /* a modal is a card — the large radius, like every panel */
 		background: var(--fs-panel);
 		border: var(--fs-hairline);
 		padding: var(--fs-card-pad);
-		min-width: 270px;
+		min-width: 16.875rem;
 	}
 
 	/* .modal > * / pre / textarea: theme/70-modal.css — absorbed with the heading ramp and the
@@ -52,9 +51,6 @@
 		visibility: visible;
 	}
 
-	.btn .close, .alert-message .close {
-		font-family: var(--fs-font-sans);
-	}
 
 	/* Colour-word block absorbed, do not re-add: .btn.<word> theme/55-buttons.css,
 	 * .alert-message/.cbi-tooltip.<word> theme/35-alerts.css. */

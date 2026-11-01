@@ -78,7 +78,7 @@ export function rewriteBase(html, base) {
 /* The 32-hex secrets a page prints literally: `sessionid`, `token`, `rollback_token` (header.ut)
  * and the rollback confirm token (luci-base footer.ut). One stub for all: replay never checks a
  * session, only that no real one ships. */
-export const TOKEN_STUB = '0'.repeat(32);
+const TOKEN_STUB = '0'.repeat(32);
 const TOKEN_RE = /\b[0-9a-f]{32}\b/g;
 export function scrubTokens(text) {
 	return text.replace(TOKEN_RE, TOKEN_STUB);
@@ -106,7 +106,7 @@ export function scrubDataDeep(value, host) {
  * in — a place `scrubDataDeep`/`scrubTokens`/`scrubHost` were both called correctly still ships
  * exactly what a call site missed, and this is the one check downstream of every call site at
  * once. `tokens` excludes `TOKEN_STUB` itself: the stub is the scrubbed answer, not a leak. */
-export function findSecrets(text, host) {
+function findSecrets(text, host) {
 	const reasons = [];
 	const tokens = text.match(/\b[0-9a-f]{32}\b/g) || [];
 	if (tokens.some((t) => t !== TOKEN_STUB)) reasons.push('a session-token-shaped 32-hex literal');

@@ -25,8 +25,7 @@
 	#packages.fs-stacked .td:nth-child(4) { display: block; text-align: start; }
 	#packages.fs-stacked .td:nth-child(4)::before { display: block; margin-bottom: var(--fs-space-1); }
 	#packages.fs-stacked .td.cbi-section-actions { margin-top: var(--fs-space-1-5); }
-	#packages.fs-stacked .td.cbi-section-actions::before,
-	#packages.fs-stacked .td:not([data-title])::before { content: none; }
+	#packages.fs-stacked .td.cbi-section-actions::before { content: none; }
 
 	:where(#view)[data-page="admin-system-package-manager"] label:has(+ .cbi-progressbar) {
 		display: block; margin: 0; font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-dim);

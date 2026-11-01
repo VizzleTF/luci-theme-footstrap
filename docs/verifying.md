@@ -156,8 +156,8 @@ What it does not judge, so a change there is looked at by hand on both routers (
 
 - how a page looks beyond the checks above. The screenshots are for a human eye, not a pixel diff:
   live counters move more pixels between two loads of the same sheet than a real regression does;
-- Firefox and WebKit beyond the anchoring check, and with them the browser floor (Chrome 108 /
-  Firefox 101 / Safari 15.4): the crawl runs Chromium only. The anchoring check runs Playwright's
+- Firefox and WebKit beyond the anchoring check, and with them the browser floor (Chrome 120 /
+  Firefox 121 / Safari 17.2): the crawl runs Chromium only. The anchoring check runs Playwright's
   current builds, and its no-native cells stand in for an old Safari by switching the feature off;
   no real Safari runs;
 - the sidebar and rail layouts, the palettes, RU text and RTL: the run uses the defaults (the top

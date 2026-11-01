@@ -29,7 +29,7 @@ case "${1:-}" in
 	*) echo "update-po: unknown option: $1" >&2; exit 1 ;;
 esac
 
-for tool in perl xgettext msgmerge msgfmt; do
+for tool in perl xgettext msgmerge msgattrib msgfmt; do
 	command -v "$tool" >/dev/null || { echo "update-po: $tool not found (install perl + gettext)" >&2; exit 1; }
 done
 
@@ -101,5 +101,6 @@ echo "scanned -> $POT ($(grep -c '^msgid' "$POT") strings)"
 for po in po/*/*.po; do
 	[ -e "$po" ] || continue
 	msgmerge --quiet --update --backup=none "$po" "$POT"
+	msgattrib --no-obsolete -o "$po" "$po" # msgmerge keeps a dropped string as #~ forever
 	echo "merged  -> $po: $(msgfmt --statistics -o /dev/null "$po" 2>&1 | tr '\n' ' ')"
 done

@@ -20,21 +20,17 @@
 		font-size: var(--fs-type-xl); font-weight: var(--fs-weight-bold); letter-spacing: -.01em;
 		overflow-wrap: anywhere;
 	}
-	.fs-login .cbi-map,
-	.fs-login .cbi-section,
-	.fs-login .cbi-section-node {
+	.fs-login .cbi-section {
 		background: none; border: 0; padding: 0; margin: 0; box-shadow: none;
 	}
 	.fs-login .cbi-value {
 		display: block; border: 0; padding: 0 0 var(--fs-space-4); margin: 0;
 	}
 	.fs-login .cbi-value-title {
-		display: block; text-align: start; width: auto; max-width: none; padding: 0 0 var(--fs-space-1-5);
+		display: block; text-align: start; padding: 0 0 var(--fs-space-1-5);
 		font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase; color: var(--fs-eyebrow-color);
 	}
-	.fs-login .cbi-value-field {
-		width: 100%; margin: 0; padding: 0;
-	}
+	.fs-login .cbi-value-field,
 	.fs-login .cbi-value-field input {
 		width: 100%; margin: 0;
 	}
@@ -42,7 +38,6 @@
 	/* column, not block: an auth plugin's second action (Reset) glues to Login under margin:0 */
 	.fs-login .cbi-page-actions {
 		display: flex; flex-direction: column; gap: var(--fs-space-2-5);
-		background: none; border: 0;
 		padding: 0; margin: var(--fs-space-1-5) 0 0; text-align: start;
 	}
 	.fs-login .cbi-page-actions .btn,

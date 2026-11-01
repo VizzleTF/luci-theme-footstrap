@@ -27,11 +27,11 @@
 		display: flex; align-items: center; justify-content: center;
 		flex: 0 0 auto;
 	}
-	.fs-logo svg { width: 20px; height: 20px; }
+	.fs-logo svg { width: 1.25rem; height: 1.25rem; }
 	.fs-logo-ring { fill: #002b49; } /* flips with mode like the favicon SVG; cyan arcs stay baked */
 	:root[data-darkmode="true"] .fs-logo-ring { fill: #e6f4fb; }
 
-	.fs-wordmark { font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); letter-spacing: -.01em; }
+	.fs-wordmark { font-size: var(--fs-type-lg); letter-spacing: -.01em; }
 
 	/* First tab stop — never display:none/visibility:hidden, that drops it from the tab order. */
 	.fs-skip {
@@ -68,17 +68,17 @@
 	/* One markup (`ul.nav > li > a`) for both layouts, so these three run once. */
 	ul.nav { position: relative; margin: 0; list-style: none; }
 	ul.nav > li { display: block; }
-	ul.nav a { line-height: 19px; text-decoration: none; }
+	ul.nav a { line-height: 1.1875rem; text-decoration: none; }
 
 	/* No emitter here, stays styled under the coverage contract — conventions.md, "Coverage is a
 	 * contract". */
 	.dropdown-menu li { display: block; position: relative; }
-	ul.nav .dropdown-menu a, .dropdown-menu a { line-height: 18px; } /* denser than ul.nav a above */
+	ul.nav .dropdown-menu a, .dropdown-menu a { line-height: 1.125rem; } /* denser than ul.nav a above */
 
 	.fs-sidebar ul.nav > li > a:hover,
 	.fs-sidebar ul.nav ul a:hover,
 	.fs-themerow:hover {
-		background: var(--fs-panel2); color: var(--fs-text); opacity: 1;
+		background: var(--fs-panel2); color: var(--fs-text);
 	}
 	.fs-sidebar ul.nav > li > a.active,
 	.fs-sidebar ul.nav ul a.active,

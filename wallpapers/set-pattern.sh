@@ -91,11 +91,14 @@ fi
 
 # --- get the bytes --------------------------------------------------------
 # Certificates are always verified. This runs as root and a failed verification is the MITM case,
-# not a reason to retry insecurely — so there is no -k anywhere, and no fallback to one.
+# not a reason to retry insecurely — so there is no -k anywhere, and no fallback to one. Every
+# downloader is tried until one SUCCEEDS, as in install.sh: a router can have uclient-fetch without
+# libustream, so the first one that exists may not speak TLS. Each next tool verifies too.
 fetch() {	# <url> <outfile>
-	if command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -T 30 -qO "$2" "$1"
-	elif command -v curl >/dev/null 2>&1; then curl -fsSL --proto '=https' --max-time 30 -o "$2" "$1"
-	else wget -q -T 30 -O "$2" "$1"; fi
+	command -v uclient-fetch >/dev/null 2>&1 && uclient-fetch -T 30 -qO "$2" "$1" && return 0
+	command -v wget >/dev/null 2>&1 && wget -q -T 30 -O "$2" "$1" && return 0
+	command -v curl >/dev/null 2>&1 && curl -fsSL --proto '=https' --max-time 30 -o "$2" "$1" && return 0
+	return 1
 }
 
 TMP="/tmp/fs-pattern.$$.svg"

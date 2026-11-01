@@ -31,7 +31,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		text-decoration: none;
-		outline: none;
 	}
 
 	/* the tab focus ring lives in theme/40-tabs.css: an accent outline is invisible on the ACTIVE

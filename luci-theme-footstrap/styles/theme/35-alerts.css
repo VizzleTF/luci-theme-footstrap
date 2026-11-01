@@ -17,11 +17,11 @@
 	 * control is a `<label class="btn alert-message danger">`, and without the guard the tint
 	 * out-ranked `.btn.danger`, fading its fill. */
 	.alert-message.warning:not(.btn) {
-		border-color: var(--fs-border); border-inline-start-color: var(--fs-warn);
+		border-inline-start-color: var(--fs-warn);
 		--fs-alert-tint: var(--fs-warn-fill);
 	}
 	.alert-message.error:not(.btn), .alert-message.danger:not(.btn) {
-		border-color: var(--fs-border); border-inline-start-color: var(--fs-danger);
+		border-inline-start-color: var(--fs-danger);
 		--fs-alert-tint: var(--fs-danger-fill);
 	}
 	.alert-message.success:not(.btn) {
@@ -31,7 +31,6 @@
 	/* .notice groups HERE, not with .label.notice's accent: ui.js emits `notice spinning` for an
 	 * IN-PROGRESS banner, so it reads as informational rather than success. */
 	.alert-message.info:not(.btn), .alert-message.notice:not(.btn) {
-		border-inline-start-color: var(--fs-accent);
 		--fs-alert-tint: var(--fs-accent-fill);
 	}
 
@@ -117,12 +116,12 @@
 		letter-spacing: 0;
 		margin: 0; min-width: 0; box-shadow: none;
 	}
-	.cbi-title .label:hover { color: var(--fs-text); border-color: var(--fs-dim); opacity: 1; }
+	.cbi-title .label:hover { color: var(--fs-text); border-color: var(--fs-dim); }
 	/* toggles section visibility — interactive, so keyboard focus must show */
 	.cbi-title .label:focus-visible {
 		outline: none; border-color: var(--fs-accent); box-shadow: var(--fs-focus-ring);
 	}
 	/* opaque surface (--fs-panel2 inherited): accent text on --fs-accent-soft measured 4.21:1
 	 * (theme/65-dropdown.css) — the border carries the accent instead */
-	.cbi-title .label.notice { opacity: 1; color: var(--fs-accent); border-color: var(--fs-accent); }
+	.cbi-title .label.notice { color: var(--fs-accent); border-color: var(--fs-accent); }
 }

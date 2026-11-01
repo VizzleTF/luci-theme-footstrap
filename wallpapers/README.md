@@ -14,7 +14,7 @@ wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/w
 
 | file | size | tile |
 |---|---|---|
-| `svg/cats.svg` | 77 kB | 870 units square, reads well around 440 px |
+| `svg/cats.svg` | 71 kB | 870 units square, reads well around 440 px |
 | `svg/dinos.svg` | 128 kB | 2048 units square, reads well around 880 px |
 
 ## Putting one back on a router without a browser

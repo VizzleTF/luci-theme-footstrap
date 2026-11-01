@@ -84,7 +84,11 @@ remainder with `--fs-content-min`. It reads the widths from the CSS tokens (`--f
 `--fs-rail-w`, `--fs-content-min`) through `getComputedStyle` rather than keeping copies. With a
 copy, narrowing the rail in the styles would leave the measurement subtracting the old number, and
 nothing would notice. The result is `data-narrow` on `:root`, read by both the CSS and
-`flyoutMode()` in the JS.
+`flyoutMode()` in the JS. The same call keeps `data-sb` as its inverse while the layout is
+`sidebar`: the vertical sidebar's rules guard on `:root[data-sb]`, not on
+`[data-layout="sidebar"]:not([data-narrow])` spelled out in every selector. The server stamps
+`data-sb` with `data-layout`, and the pre-paint and `applyLayout()` set it with the layout, so
+the chrome is right before the first fit and with JS off.
 
 **The subtraction itself is `columnWidth()`, and there is exactly one of it.** Two callers need the
 width of the content column. `fitShell()` decides whether the sidebar still fits beside it.
@@ -117,7 +121,8 @@ the `anchor` job ([verifying.md](verifying.md)).
 
 The one literal is `@media (min-width: 521px)` around the vertical override in `20-shell.css`. It
 is the floor below which no slice leaves a readable 500 px. It is also the safety net with JS
-disabled: no JS means no `data-narrow`, and a phone would otherwise draw the desktop sidebar.
+disabled: no JS means no `data-narrow` and a `data-sb` that stays as stamped, and a phone would
+otherwise draw the desktop sidebar.
 
 The top bar measures too. `fitChrome()` first lets `fitTabStrips()` squeeze the menu pills
 (`.fs-dense1`, then `.fs-dense2`). If the menu still wraps, it adds `.fs-ind-compact`, and only then
@@ -160,7 +165,7 @@ dragging the sidebar off-screen. Paint containment clips it at `.fs-main`; LuCI'
 `<body>`, outside it.
 
 **The rail's guard must be the vertical sidebar's, exactly**: same media floor, same
-`:not([data-narrow])`. The rail is a mode of the vertical sidebar and is never visible where the
+`[data-sb]`. The rail is a mode of the vertical sidebar and is never visible where the
 vertical sidebar is not. A different floor would draw the full sidebar while the JS subtracts the
 rail's width.
 
@@ -209,7 +214,7 @@ changes nothing past `fs-dense1`.
 - A chrome icon is a bare `<svg class="fs-ico" aria-hidden="true" viewBox="0 0 24 24">`. Its fill,
   stroke, 1.9 width and round caps come from the one `.fs-ico, .fs-chevron` rule in
   `theme/20-shell.css`, not five attributes per element (100 B each, 300 B of every admin page).
-  `header.ut` writes its three inline, and `svgIcon()` (`fs-widgets.js`) emits the same markup for
+  `header.ut` writes its three inline, and `svgIcon()` (`fs-chrome.js`) emits the same markup for
   the menu and the search palette. A class outside the rule draws a filled black glyph.
 - `<body>` → a `.fs-shell` flex wrapper. Before it, the skip link `.fs-skip`
   ("Skip to content" → `#maincontent`), the first tab stop on the page.
@@ -244,7 +249,7 @@ dropdown. The top layout is that mode at desktop width.
   inlined as strings in the JS (`E()` cannot build SVG: see [conventions.md](conventions.md)).
 - `renderMainMenu` sits in `fs-chrome.js` beside `renderModeMenu` and `renderTabMenu`, together
   with the rail (`wireRail()`) and chrome measurement (`fitShell()`, `fitChrome()`).
-  `menu-footstrap-common.js` calls `chrome.wireMenu()` and `chrome.start()`, so the renderer is no
+  `menu-footstrap.js` calls `chrome.wireMenu()` and `chrome.start()`, so the renderer is no
   injected parameter. The SPA router lives in `fs-router.js`.
 - The top-level `admin/logout` node is dropped from the tree. The chrome draws its own Log out
   (`header.ut`), which would otherwise appear twice.
@@ -315,9 +320,9 @@ at all until you are already there: "Port Forwards" is a tab of Network → Fire
 - **Recently visited rows are kept in `localStorage` `fs-recent`, one menu path each.** Only the
   path is stored. The title is resolved through the index on every render, so it follows the UI
   language, and a page an ACL change hides is dropped instead of shown dead.
-  `menu-footstrap-common` owns the writer (`remember()`), and `warmRecent()` prefetches each path.
+  `menu-footstrap` owns the writer (`remember()`), and `warmRecent()` prefetches each path.
   The key, the cap of 8 and the reader (`recentPaths()`) live once in `fs-prefs`.
-  `menu-footstrap-common` alone binds the button, Ctrl/Cmd+K and `/`, calling `fs-search`'s
+  `menu-footstrap` alone binds the button, Ctrl/Cmd+K and `/`, calling `fs-search`'s
   `open`/`toggle`: see [spa-router.md](spa-router.md).
 
 **Do not index through `ui.menu.getChildren()`.** On an alias node it returns the alias target's

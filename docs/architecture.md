@@ -118,16 +118,14 @@ its RPCs would answer "Access denied". Server rendering also works with JS off.
 ## The menu is entirely client-side
 
 The server header emits empty containers by id; client JS fills them. The footer loads the entry
-with `L.require('menu-footstrap')` (it only calls `menu-footstrap-common`; `fs-chrome` is the
-renderer), then `L.require('fs-select')`.
+with `L.require('menu-footstrap')` (it wires the chrome; `fs-chrome` is the renderer), then `L.require('fs-select')`.
 
 Menu JS lives in `htdocs/luci-static/resources/`, **not** in the theme directory, because
 `L.require()` resolves against `resourcebase`. From there it pulls its dependencies through
 `'require <module> as <name>'` pragmas:
 
 ```
-menu-footstrap        → menu-footstrap-common
-menu-footstrap-common → ui, fs-menutree, fs-chrome, fs-router,
+menu-footstrap        → ui, fs-menutree, fs-chrome, fs-router,
                         fs-prefs, fs-sheets
 fs-select             (no requirer — the footer loads it directly)
 fs-overview           (page module, see below)
@@ -137,15 +135,15 @@ The graph is acyclic and the runtime enforces it: `require()` throws `Dependency
 
 **One module is loaded by page, not by pragma.** `fs-overview` works on Status → Overview only,
 a page `luci-mod-status` owns. A `'require'` pragma would load it on every admin page, so
-`menu-footstrap-common.js` carries a map from `data-page` to module name (`PAGE_MODULES`) and
+`menu-footstrap.js` carries a map from `data-page` to module name (`PAGE_MODULES`) and
 requires the module when that page appears (server-stamped or router-stamped). The loader owns the observer on
 `body[data-page]` and calls the module's `wire()` on every stamp; `wire()` re-checks the page
 itself (`onPage()`). The map repeats a page name the module also tests, so the two must be edited
 together.
 
-`fs-appearance` (the Appearance controls) is not a page module: it owns a route of its own,
+The Appearance controls are not a page module: they are the view of a route of their own,
 `/admin/system/footstrap` (`root/usr/share/luci/menu.d/luci-theme-footstrap.json`, dispatched to
-`view/footstrap/appearance.js`), which requires it by pragma like any ordinary view.
+`view/footstrap/appearance.js`), which LuCI loads like any ordinary view.
 
 **There is no update checker, and nothing that loads one.** The installer adds the owfeed-packages
 feed, so `apk upgrade` / `opkg upgrade` carries the theme forward. A settings page has no
@@ -179,7 +177,7 @@ Exactly one entry: [package.md](package.md).
                                        app-icon-192.png, manifest.json
                                        bg -> /etc/footstrap/login-bg, fonts -> /etc/footstrap/fonts
                                        (symlinks made by uci-defaults)
-/www/luci-static/resources/            menu-footstrap.js, menu-footstrap-common.js, fs-*.js,
+/www/luci-static/resources/            menu-footstrap.js, fs-*.js,
                                        view/footstrap/appearance.js
 /www/cgi-bin/luci-theme-footstrap-pattern      serves the uploaded pattern under CSP
 /usr/lib/lua/luci/i18n/footstrap.<lang>.lmo    shipped by luci-i18n-footstrap-<lang>, not the theme package
@@ -203,7 +201,7 @@ top bar, logo and indicators, and re-order the stock overview sections.
 The theme **cannot** turn the overview into a KPI dashboard with a memory ring and sparklines —
 that is a view module in a separate `luci-app-*`.
 
-`fs-overview.js` is a page module (`PAGE_MODULES` in `menu-footstrap-common.js`). It rearranges
+`fs-overview.js` is a page module (`PAGE_MODULES` in `menu-footstrap.js`). It rearranges
 the stock overview sections, marks the meters (`data-fs-level`) and makes card headings
 disclosures. The data stays `luci-mod-status`'s.
 

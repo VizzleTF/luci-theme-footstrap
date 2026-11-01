@@ -31,6 +31,7 @@ rsync -a --delete \
 	--exclude 'styles' \
 	--exclude 'build-css.sh' \
 	--exclude 'mangle-tokens.sh' \
+	--exclude 'mangle-classes.sh' \
 	--exclude 'strip-build.sh' \
 	--exclude 'build-apk.sh' \
 	--exclude 'dev-sync.sh' \
@@ -46,7 +47,7 @@ rsync -a --delete \
 # the far side. (--delete-excluded would take that too.)
 # `po` is NOT in this list on purpose: it is excluded from the send because Weblate owns it there,
 # which means the copy that is already in that tree must be left exactly where it is.
-for stale in styles build-css.sh mangle-tokens.sh strip-build.sh \
+for stale in styles build-css.sh mangle-tokens.sh mangle-classes.sh strip-build.sh \
              build-apk.sh dev-sync.sh update-po.sh luci-upstream.pin README.md; do
 	rm -rf "$OUT/$stale"
 done

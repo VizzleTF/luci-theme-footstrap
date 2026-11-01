@@ -9,8 +9,7 @@
 		/* derived from -base so the accent-hue axis has one copy to rotate */
 		--fs-accent: var(--fs-accent-base);
 		/* tint OF --fs-accent, mixed FROM it so it never goes stale. The formula lives on :root only;
-		 * dark blocks re-state the percentage, since a (0,2,0) re-declaration would outrank the
-		 * (0,1,0) twin in 04-nocolormix.css and leave the token invalid without color-mix. */
+		 * dark blocks re-state the percentage. */
 		--fs-accent-soft-mix: 10%;
 		--fs-accent-soft: color-mix(in srgb, var(--fs-accent) var(--fs-accent-soft-mix), transparent);
 		/* surfaces + status: raw per palette, derived form is read everywhere else */

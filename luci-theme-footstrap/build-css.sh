@@ -211,6 +211,13 @@ squeeze() {
 						w = (substr(line, i + 2, 6) == "before") ? 6 : (substr(line, i + 2, 5) == "after") ? 5 : 0
 						if (w && substr(line, i + 2 + w, 1) !~ /[-A-Za-z0-9_]/) { i++; continue }
 					}
+					# transparent -> #0000: the same computed rgba(0,0,0,0) in 6 bytes fewer (4-digit hex: Chrome
+					# 62, Safari 10), 97 sites. A whole word inside a declaration only, never part of an ident.
+					if (c == "t" && bk[d] == "D" && substr(line, i, 11) == "transparent" &&
+					    substr(line, i + 11, 1) !~ /[-A-Za-z0-9_(]/ &&
+					    (length(out) ? substr(out, length(out), 1) : lastc) !~ /[-A-Za-z0-9_]/) {
+						out = out "#0000"; lastreal = "0"; i += 11; continue
+					}
 					# bk[d] is the kind of the open block: G holds rules (@layer @media @supports @container
 					# @keyframes), D holds declarations (a style rule, @font-face, a keyframe step). st: a
 					# statement has started, pk: its kind. The value rewrites cannot tell a nested rule from a

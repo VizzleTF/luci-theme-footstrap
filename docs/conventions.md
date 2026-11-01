@@ -174,8 +174,8 @@ node-less build runs jsmin. What a comment says is governed by "Comments" below.
 **A required module is a singleton; there is no inheritance between modules.** `'require X'`
 hands you a constructed instance, not a class. `base.extend` from another module therefore throws
 `base.extend is not a function`, and returning a plain object throws `factory yields invalid
-constructor`. Compose instead: `menu-footstrap-common.js` exports `init()`, and
-`menu-footstrap.js` is a one-line footer entry that calls it. The renderer lives in `fs-chrome.js`.
+constructor`. Compose instead: `menu-footstrap.js` wires the chrome from its `__init__()` and
+calls into `fs-chrome.js`, which renders it.
 
 **Require a *stock* class through `window.L`.** The `L` a module factory receives and
 `window.L` are different objects, and `ui` hangs its helpers (`itemlist`, `showModal`, …) on
@@ -194,7 +194,8 @@ uncollapsed, re-fit synchronously on a mutation, coalesce on resize) are in the 
 
 **Never answer "does it fit?" with a viewport breakpoint.** The sidebar gives way when the
 *content column* would be unreadable, which depends on the sidebar's width (expanded or rail).
-`data-narrow` on `:root` is the single source of truth, read by both CSS and `flyoutMode()`.
+`data-narrow` on `:root` is the single source of truth, read by both CSS and `flyoutMode()`;
+the CSS reads it through `data-sb`, which `fitShell()` writes from it in the same call.
 
 **Observer hygiene.** Watch the narrowest node, use `attributeFilter`, guard against your own
 writes, coalesce into one frame, `disconnect()` on teardown. LuCI's poll rewrites content once a
@@ -324,7 +325,7 @@ image ships `uclient-fetch`); fall back, do not depend. `jsonfilter`, `sha256sum
 in the base image.
 
 **Every shipped `/etc/config/*` is a declared conffile.** `/etc/config/footstrap` is written at
-runtime by Save-as-default, and an undeclared one is replaced on upgrade. Every shipped
+runtime by Save to router, and an undeclared one is replaced on upgrade. Every shipped
 `acl.d/*.json` parses and grants something: rpcd skips an unreadable file silently.
 
 **A language is listed in three places**: `po/<lang>/`, `tools/stage.sh` and `owfeed.yml`, with

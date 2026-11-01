@@ -3,7 +3,7 @@
 	 * docs/design-system.md "Two tiers, and the split is load-bearing". */
 	:root {
 		/* palette colours live in 03-palettes.css */
-		--fs-shadow-pop: 0 12px 34px rgba(0,0,0,.30);	/* pop surfaces: menus, dropdown lists, the select picker */
+		--fs-shadow-pop: 0 12px 34px rgba(0,0,0,.3);	/* pop surfaces: menus, dropdown lists, the select picker */
 		/* which of the three a control takes: docs/design-system.md "The derived ladder" */
 		--fs-focus-ring: 0 0 0 3px var(--fs-accent-soft);
 		--fs-focus-ring-solo: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-accent);
@@ -38,10 +38,11 @@
 		--fs-danger-line-hi: color-mix(in srgb, var(--fs-danger) 55%, transparent);
 
 		/* ours, redrawn to stay so — not Lucide's. docs/design-system.md "Two glyphs drawn as
-		 * tokens, not fetched". */
-		--fs-icon-refresh: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'><path d='M4.4 9.6A8.5 8.5 0 0 1 18.6 7.6'/><path d='M19.6 14.4A8.5 8.5 0 0 1 5.4 16.4'/><path fill='%23000' stroke='none' d='M21.6 10.6 15.4 8.4 20.4 4.2Z'/><path fill='%23000' stroke='none' d='M2.4 13.4 8.6 15.6 3.6 19.8Z'/></svg>");
+		 * tokens, not fetched". A mask glyph keys on alpha only, so every mask SVG here and in
+		 * 60-inputs/95-luci paints in `red`, the shortest opaque colour. */
+		--fs-icon-refresh: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' stroke-width='2' stroke-linecap='round'><path fill='none' stroke='red' d='M4.4 9.6a8.5 8.5 0 0 1 14.2-2m1 6.8a8.5 8.5 0 0 1-14.2 2'/><path d='m21.6 10.6-6.2-2.2 5-4.2zM2.4 13.4l6.2 2.2-5 4.2z'/></svg>");
 		/* a glyph inlined once, sized at two call sites — keep them in step by hand */
-		--fs-icon-refresh-sz: calc(18px * var(--fs-density-type));
+		--fs-icon-refresh-sz: calc(1.125rem * var(--fs-density-type));
 
 		/* direction flips by mode: light darkens, dark brightens (`filter` recolours the ink too) */
 		--fs-hover-lift: brightness(.90);
@@ -52,13 +53,16 @@
 		--fs-dur-fade: .25s;	/* a transient thing fading in or out: spinner, notification */
 		--fs-dur-fill: .4s;	/* a progress bar growing to its value */
 		--fs-content-max: 1280px;	/* content column cap */
+		/* <html>'s font-size, so every rem token: a share of the browser's own size. The Text size
+		 * axis writes it inline. */
+		--fs-text-size: 100%;
 		/* also read by the bar's centering calc and the notification-width calc */
 		--fs-content-pad: calc(28px * var(--fs-density-space));
 		/* tokens, not literals — fs-chrome.js's fitShell() reads them back. docs/design-system.md
 		 * "Scales" ("Shell geometry"). */
-		--fs-sidebar-w: calc(224px * var(--fs-density-box));		/* the expanded vertical sidebar's column */
-		--fs-rail-w: calc(68px * var(--fs-density-box));		/* ...and the same sidebar collapsed to its icon rail */
-		--fs-content-min: 500px;	/* below this a content column stops being readable */
+		--fs-sidebar-w: calc(14rem * var(--fs-density-box));		/* the expanded vertical sidebar's column */
+		--fs-rail-w: calc(4.25rem * var(--fs-density-box));		/* ...and the same sidebar collapsed to its icon rail */
+		--fs-content-min: 31.25rem;	/* below this a content column stops being readable */
 		/* opaque on purpose. docs/design-system.md "The derived ladder". */
 		--fs-bar-bg: var(--fs-panel);
 		/* drawn, not fetched. docs/design-system.md "Two glyphs drawn as tokens, not fetched". */
@@ -66,9 +70,9 @@
 			linear-gradient(-45deg, transparent 45%, var(--fs-dim) 45% 55%, transparent 55%),
 			linear-gradient(45deg, transparent 45%, var(--fs-dim) 45% 55%, transparent 55%);
 		/* the bar's designed height; fs-chrome.js publishes the measured one as --fs-bar-live */
-		--fs-bar-h: calc(46px * var(--fs-density-box));
+		--fs-bar-h: calc(2.875rem * var(--fs-density-box));
 		/* logo box, .fs-themerow controls, Log out and the poll pill share this size */
-		--fs-btn-size: calc(34px * var(--fs-density-box));
+		--fs-btn-size: calc(2.125rem * var(--fs-density-box));
 
 		/* one base (Appearance -> Rounding); three radii scale from it */
 		--fs-radius-base: 12px;
@@ -91,17 +95,17 @@
 		--fs-density-box: 1;
 
 		/* chrome-control floors, not a field's height (--fs-control-h below) */
-		--fs-ctl-h-sm: calc(30px * var(--fs-density-box));	/* dense/small: .btn.small, table-row buttons */
-		--fs-ctl-h: calc(38px * var(--fs-density-box));	/* the default control */
-		--fs-ctl-h-lg: calc(44px * var(--fs-density-box));	/* prominent: .btn.large, the login submit */
+		--fs-ctl-h-sm: calc(1.875rem * var(--fs-density-box));	/* dense/small: .btn.small, table-row buttons */
+		--fs-ctl-h: calc(2.375rem * var(--fs-density-box));	/* the default control */
+		--fs-ctl-h-lg: calc(2.75rem * var(--fs-density-box));	/* prominent: .btn.large, the login submit */
 
 		/* rounded in @supports below (round() is younger than the floor) */
-		--fs-type-2xs: calc(10px * var(--fs-density-type));
-		--fs-type-xs: calc(11px * var(--fs-density-type));	/* eyebrow, badges, tooltips, dense metadata */
-		--fs-type: calc(13px * var(--fs-density-type));		/* body, tables, fields, menu items — the base */
-		--fs-type-lg: calc(16px * var(--fs-density-type));	/* section titles (h3/legend), alert headings */
-		--fs-type-xl: calc(20px * var(--fs-density-type));	/* page titles */
-		--fs-type-2xl: calc(26px * var(--fs-density-type));	/* h1: error500 and third-party apps; the chrome title and the login h1 are .fs-sr */
+		--fs-type-2xs: calc(.625rem * var(--fs-density-type));
+		--fs-type-xs: calc(.6875rem * var(--fs-density-type));	/* eyebrow, badges, tooltips, dense metadata */
+		--fs-type: calc(.8125rem * var(--fs-density-type));		/* body, tables, fields, menu items — the base */
+		--fs-type-lg: calc(1rem * var(--fs-density-type));	/* section titles (h3/legend), alert headings */
+		--fs-type-xl: calc(1.25rem * var(--fs-density-type));	/* page titles */
+		--fs-type-2xl: calc(1.625rem * var(--fs-density-type));	/* h1: error500 and third-party apps; the chrome title and the login h1 are .fs-sr */
 		/* iOS Safari zooms the page when a field under 16px takes focus and never zooms back; max() holds
 		 * the floor at Compact, where --fs-type-lg is 14.4px. -field/-field-xs are the size typed text is
 		 * set in: the body (or dense) size on desktop, the floor under 767px (@media below). */
@@ -141,7 +145,7 @@
 		--fs-control-h: calc(var(--fs-type) * var(--fs-leading) + var(--fs-space-1) * 2 + 2px);
 
 		/* ceiling for an elastic `.cbi-value-field` (flex: 1) — a COLUMN width, off the 4px scale */
-		--fs-field-max: 440px;
+		--fs-field-max: 27.5rem;
 
 		/* every z-index but the content's own stacking (wallpaper -1, sticky table heads 1-2) */
 		--fs-z-raise: 2;
@@ -197,12 +201,12 @@
 	/* round(…) tested where a length is expected, not by a calc() probe */
 	@supports (width: round(1px, 1px)) {
 		:root {
-			--fs-type-2xs: calc(round(10px * var(--fs-density-type), 1px));
-			--fs-type-xs: calc(round(11px * var(--fs-density-type), 1px));
-			--fs-type: calc(round(13px * var(--fs-density-type), 1px));
-			--fs-type-lg: calc(round(16px * var(--fs-density-type), 1px));
-			--fs-type-xl: calc(round(20px * var(--fs-density-type), 1px));
-			--fs-type-2xl: calc(round(26px * var(--fs-density-type), 1px));
+			--fs-type-2xs: calc(round(.625rem * var(--fs-density-type), 1px));
+			--fs-type-xs: calc(round(.6875rem * var(--fs-density-type), 1px));
+			--fs-type: calc(round(.8125rem * var(--fs-density-type), 1px));
+			--fs-type-lg: calc(round(1rem * var(--fs-density-type), 1px));
+			--fs-type-xl: calc(round(1.25rem * var(--fs-density-type), 1px));
+			--fs-type-2xl: calc(round(1.625rem * var(--fs-density-type), 1px));
 			--fs-control-h: calc(round(up, calc(var(--fs-type) * var(--fs-leading) + var(--fs-space-1) * 2 + 2px), 4px));
 		}
 	}

@@ -27,16 +27,15 @@
 	.cbi-value-field .ifacebadge { font-family: var(--fs-font-sans); }
 	code, pre { font-weight: var(--fs-weight-normal); }
 
-	.cbi-title-ref { color: var(--fs-accent); }
 	.close { color: var(--fs-text); text-shadow: none; opacity: .6; }
 	.close:hover { opacity: 1; }
-	.ifacebox { background: var(--fs-panel); border-color: var(--fs-border); }
+	.ifacebox { background: var(--fs-panel); }
 	.ifacebox .ifacebox-head { background: var(--fs-panel2); color: var(--fs-text); }
 	/* lives in THIS layer, next to the head it overrides: the same rule in base was dead, a layer beats specificity */
 	.ifacebox .ifacebox-head.active { background: var(--fs-accent); color: var(--fs-on-accent); }
-	.ifacebadge { background: var(--fs-panel2); border-color: var(--fs-border); }
+	.ifacebadge { background: var(--fs-panel2); }
 	.ifacebadge-active { border-color: var(--fs-accent); }
-	.zonebadge-empty { border-color: var(--fs-border); color: var(--fs-dim); }
+	.zonebadge-empty { color: var(--fs-dim); }
 
 	/* @container PLUMBING only, card rules live with the tables. Named: an unnamed query binds to the nearest container-type ancestor, silently re-targeted by a new one */
 	.cbi-map { container-type: inline-size; container-name: fs-content; }
@@ -82,7 +81,6 @@
 		border-radius: var(--fs-radius-lg) var(--fs-radius-lg) 0 0;
 		padding-bottom: var(--fs-space-1);
 		margin-bottom: 0;
-		box-shadow: none;
 	}
 	.cbi-map > h2 + .cbi-map-descr,
 	#view > h2 + .cbi-map-descr {

@@ -102,7 +102,7 @@
 
 	/* sticks each .th, not the row — a row's fill does not travel with a sticky cell here. 0 in
 	 * the sidebar (.fs-main scrolls itself), --fs-bar-live where the document does. */
-	:where(:root[data-layout="sidebar"]:not([data-narrow]) #view, #modal_overlay)
+	:where(:root[data-sb] #view, #modal_overlay)
 		.table.fs-dt:not(.fs-stacked) .tr.table-titles .th {
 		position: sticky; top: 0; z-index: 1;
 		background: var(--fs-panel2);
@@ -165,7 +165,7 @@
 	}
 	/* below ~560px the 40%/nowrap column starves the value — stacked below (560, not the config
 	 * table's 960px). :first-child:first-child doubles the pseudo-class ON PURPOSE, to outrank. */
-	@container fs-content (max-width: 560px) {
+	@container fs-content (max-width: 35rem) {
 		/* the row's own .td/.th padding above spent a FULL padding per half; moved to the ROW */
 		.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.th)):not(:has(.td:nth-child(3))):not([style*="table-layout"]) .tr {
 			display: block;
@@ -226,7 +226,7 @@
 	}
 	/* 6%, not 12%: bold --fs-danger on a tint OF --fs-danger eats its own contrast (12% measured
 	 * 4.4:1); at 6% every palette clears 4.5 (4.87/4.95/5.28/6.09) */
-	.cbi-section-error { border-color: var(--fs-danger); background: color-mix(in srgb, var(--fs-danger) 6%, var(--fs-panel)); color: var(--fs-text); }
+	.cbi-section-error { background: color-mix(in srgb, var(--fs-danger) 6%, var(--fs-panel)); color: var(--fs-text); }
 	.cbi-section-error ul li { color: var(--fs-danger); }
 
 	/* denser data tables (dhcp static leases, section-tables) */
@@ -240,7 +240,7 @@
 	.table.cbi-section-table:not(.cbi-section *):not(.cbi-section-node *) .th,
 	.table.cbi-section-table:not(.cbi-section *):not(.cbi-section-node *) .td { padding: var(--fs-space-2-5) var(--fs-space-3); }
 	.cbi-section-table .tr.cbi-section-table-titles .th,
-	.cbi-section-table .tr.table-titles .th { font-size: var(--fs-type-xs); letter-spacing: var(--fs-eyebrow-tracking); line-height: 1.25; }
+	.cbi-section-table .tr.table-titles .th { line-height: 1.25; }
 
 	/* standalone data tables -> rounded card; inside a CBI section the section already IS the
 	 * card, so the frame is stripped there (above) */
@@ -258,8 +258,8 @@
 	.table .tr:not(.table-titles):not(.cbi-section-table-titles):not(:last-child) > .td,
 	.table .tr.cbi-section-table-row:not(:last-child)::before { border-bottom: var(--fs-hairline); }
 	/* per-CELL border, so a foreign `position: relative; top:` (dashboard) drags one cell's
-	 * border out of line — `top` AND `bottom` cancels either without touching `relative` itself */
-	:is(#view, #modal_overlay) .fs-dt .td { top: auto; bottom: auto; }
+	 * border out of line — `inset-block` cancels `top` and `bottom` without touching `relative` itself */
+	:is(#view, #modal_overlay) .fs-dt .td { inset-block: auto; }
 	/* descendant combinator so a real <table>'s inserted <tbody> is covered too */
 	.table .tr.table-titles, .table .tr.cbi-section-table-titles {
 		background: transparent;	/* drop the base panel2 header bar — match the dashboard's faint-label + underline look */
@@ -325,7 +325,6 @@
 	}
 	/* a footer cell needs [data-title] in its OWN selector to win the caption rule's (0,4,0) */
 	.table.fs-stacked .td.cbi-section-actions::before,
-	.table.fs-stacked .td:not([data-title])::before,
 	.table.fs-stacked .td[data-title=""]::before,
 	.table.fs-stacked tfoot .td[data-title]::before,
 	.table.fs-stacked .tfoot .td[data-title]::before { content: none; }
@@ -342,7 +341,7 @@
 	/* width: 0 — the label's nowrap min-content (288px for a Russian item at 360px) sizes the table-row-group
 	 * past the card (td right 442 vs 315); basis `content` still sizes the item to its label (it was 266px, a whole card, with `1 1 auto`). Copy in theme/65-dropdown.css. */
 	.table.fs-stacked .td.cbi-section-actions > .cbi-dropdown {
-		flex: 0 1 content; width: 0; min-width: 0;
+		flex: 0 1 content; width: 0;
 	}
 	/* nothing in a half-width cell may force the row wider than the viewport — .fs-main clips,
 	 * it does not scroll to an over-wide child */
@@ -359,7 +358,7 @@
 	/* --- DATA table flavour (L.ui.Table, tagged .fs-dt) --- the frame stays overflow:visible so a
 	 * ComboButton's open list can leave the card; zebra and hover paint on the .tr, so the two outer
 	 * rows carry the frame's inner radius (its radius less the 1px border) instead of a clip. */
-	.table.fs-dt.fs-stacked :is(.tr:first-child, :is(.tr.table-titles, .thead) + .tr) {
+	.table.fs-dt.fs-stacked :is(.tr:first-child, .tr.table-titles + .tr, .thead + .tr) {
 		border-start-start-radius: calc(var(--fs-radius-lg) - 1px);
 		border-start-end-radius: calc(var(--fs-radius-lg) - 1px);
 	}
@@ -383,19 +382,16 @@
 
 	/* column weights (1-10): a share of a CARDED row, unguarded — `flex` only applies once a
 	 * `.td` becomes a flex item, so one copy serves every tier and is inert elsewhere. */
-	.table .td.col-1,  .table .th.col-1  { flex: 1 1 30px; }
-	.table .td.col-2,  .table .th.col-2  { flex: 2 2 60px; }
-	.table .td.col-3,  .table .th.col-3  { flex: 3 3 90px; }
-	.table .td.col-4,  .table .th.col-4  { flex: 4 4 120px; }
-	.table .td.col-5,  .table .th.col-5  { flex: 5 5 150px; }
-	.table .td.col-6,  .table .th.col-6  { flex: 6 6 180px; }
-	.table .td.col-7,  .table .th.col-7  { flex: 7 7 210px; }
-	.table .td.col-8,  .table .th.col-8  { flex: 8 8 240px; }
-	.table .td.col-9,  .table .th.col-9  { flex: 9 9 270px; }
-	.table .td.col-10, .table .th.col-10 { flex: 10 10 300px; }
-
-	/* general table cell padding — compact but readable (Startup/Processes/etc) */
-	.table .td { padding-top: var(--fs-space-2); padding-bottom: var(--fs-space-2); }
+	.table .td.col-1,  .table .th.col-1  { flex: 1 1 1.875rem; }
+	.table .td.col-2,  .table .th.col-2  { flex: 2 2 3.75rem; }
+	.table .td.col-3,  .table .th.col-3  { flex: 3 3 5.625rem; }
+	.table .td.col-4,  .table .th.col-4  { flex: 4 4 7.5rem; }
+	.table .td.col-5,  .table .th.col-5  { flex: 5 5 9.375rem; }
+	.table .td.col-6,  .table .th.col-6  { flex: 6 6 11.25rem; }
+	.table .td.col-7,  .table .th.col-7  { flex: 7 7 13.125rem; }
+	.table .td.col-8,  .table .th.col-8  { flex: 8 8 15rem; }
+	.table .td.col-9,  .table .th.col-9  { flex: 9 9 16.875rem; }
+	.table .td.col-10, .table .th.col-10 { flex: 10 10 18.75rem; }
 
 	/* last resort: no header row, never carded (no data-title to print). .fs-xscroll: same,
 	 * MEASURED to overflow; refused to a table holding a widget (clips a popup inside). */

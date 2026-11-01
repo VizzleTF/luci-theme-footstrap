@@ -40,7 +40,7 @@ PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=LICENSE
 
 # /etc/config/footstrap is SHIPPED as an empty stub and WRITTEN AT RUNTIME: Appearance ->
-# "Save as default" has rpcd uci-set the router-wide axes into that very file. Without this define
+# "Save to router" has rpcd uci-set the router-wide axes into that very file. Without this define
 # the package manager owns it as an ordinary file and REPLACES it on upgrade, so the admin's saved
 # defaults are wiped by the theme's own one-click Update, silently and reported as success.
 # OpenWrt honours the define for BOTH formats (include/package-pack.mk), so one covers 24.10's opkg
@@ -91,7 +91,8 @@ endef
 # opkg runs the OLD package's postrm with "upgrade" on a version upgrade; it must change nothing
 # there, since reverting mediaurlbase flipped upgrading 24.10 users back to bootstrap (apk never
 # runs it on upgrade). Removal restores bootstrap only if its media dir and header.ut exist, drops
-# /etc/footstrap (the uploaded login background) and, as in the postinst, no rpcd reload.
+# /etc/footstrap (the uploaded login background) with the two links uci-defaults points at it, which
+# the package manager does not own, and, as in the postinst, no rpcd reload.
 define Package/luci-theme-footstrap/postrm
 #!/bin/sh
 case "$$1" in *upgrade*) exit 0 ;; esac
@@ -105,6 +106,8 @@ case "$$1" in *upgrade*) exit 0 ;; esac
 	esac
 	uci commit luci
 	rm -rf /etc/footstrap >/dev/null 2>&1 || true
+	rm -f /www/luci-static/footstrap/bg /www/luci-static/footstrap/fonts
+	rmdir /www/luci-static/footstrap >/dev/null 2>&1 || true
 	rm -f /tmp/luci-indexcache* /tmp/luci-modulecache/* >/dev/null 2>&1 || true
 }
 endef
@@ -119,12 +122,16 @@ define Build/Prepare/luci-theme-footstrap
 	# htdocs/ root/ ucode/; the copy is metadata only, luci.mk never installs it.
 	$(CP) $(CURDIR)/LICENSE $(PKG_BUILD_DIR)/
 	$(SHELL) $(CURDIR)/build-css.sh $(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css
-	# Private `--fs-*` names are 13% of the sheet; runs BEFORE the templates strip, which takes the
+	# Private `--fs-*` names are 14% of the sheet; runs BEFORE the templates strip, which takes the
 	# comments it reads.
 	$(SHELL) $(CURDIR)/mangle-tokens.sh \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css \
 		$(PKG_BUILD_DIR)/htdocs/luci-static/resources $(PKG_BUILD_DIR)/ucode
-	# Strips `{# … #}`, whole-line `/* … */` and the indentation from the templates (-27.2 KB of 47.2).
+	# The theme's own `.fs-*` class names, whole tokens, the same trees.
+	$(SHELL) $(CURDIR)/mangle-classes.sh \
+		$(PKG_BUILD_DIR)/htdocs/luci-static/footstrap/cascade.css \
+		$(PKG_BUILD_DIR)/htdocs/luci-static/resources $(PKG_BUILD_DIR)/ucode
+	# Strips `{# … #}`, whole-line `/* … */` and the indentation from the templates (-27.6 KB of 48.3).
 	# dev-sync.sh does not run this, so a router being debugged keeps its comments and indentation.
 	$(SHELL) $(CURDIR)/strip-build.sh templates $(PKG_BUILD_DIR)/ucode
 	# The same for the shell under root/ (about half of uci-defaults and the CGI are comments);

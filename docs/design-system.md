@@ -24,8 +24,9 @@ comment beside each one. This page does not repeat them: a copy here would drift
 where it outranks any `@layer`. One app declaring `:root { --accent: … }`, or `--text-color-high`
 (a convention, so apps declare it readily), would recolour the whole theme if the theme read it.
 
-The exception is a local variable declared in the same rule that reads it (`--bd-color`,
-`--fg-color`): a foreign `:root` cannot intercept it.
+A local variable declared in the same rule that reads it (`--fs-bd-color`, `--fs-fg-color`) is
+safe as well: a foreign `:root` cannot intercept it. It still takes the `--fs-` prefix, because
+`mangle-tokens.sh` shortens only `--fs-*` names.
 
 ```css
 /* NO: reading an export name */
@@ -91,8 +92,8 @@ Every surface and role colour goes through a `-base` token (`--fs-bg-base`, `--f
 `--fs-accent-base`, `--fs-good-base` and so on), so the tint, accent and colour axes can derive from
 it; a palette never declares `--fs-good` directly. Set the dark block's four inks. Then register the
 name in three places, each failing quietly if skipped: the PALETTE axis in `fs-axes.js`, the
-`_sd_pal` whitelist and pre-paint switch in `partials/head.ut`, and the label map in
-`fs-appearance.js`.
+`palette` whitelist and the pre-paint `list('palette', …)` in `partials/head.ut`, and the label map in
+`view/footstrap/appearance.js`.
 
 ### Transparency: cards and the menu over the wallpaper
 
@@ -114,8 +115,12 @@ glass, or an app's tile would sit on a glass card as a solid block.
 
 Contrast on a translucent surface is still undefined: it depends on the pixel behind. So the glass
 is opt-in, Photo dim still darkens the photo under it, and it stays off when the system asks for
-less transparency or more contrast. JS reads those queries, not `@media`: Safari and Firefox do not
-know `prefers-reduced-transparency`, and an unknown query would turn the glass off there. The
+more contrast or forces colours. A system asking for less transparency holds back only an opacity
+that came from the router. Windows' "Transparency effects" switch reaches Chromium as that query,
+and an opacity set in this browser is its user asking for glass here (issue #87). The Appearance
+page says which of the two keeps the surfaces solid. JS reads those queries, not `@media`: Safari
+and Firefox do not know `prefers-reduced-transparency`, and an unknown query would turn the glass
+off there. The
 Appearance page's contrast readouts measure the solid palette and hide where the surface itself is
 translucent.
 
@@ -125,7 +130,7 @@ blurs nothing behind an element inside a blurred one, so a sticky table cell und
 relies on a 95% fill instead. For the same reason the bar and the rail blur on a layer under
 themselves (`.fs-sidebar::before`), so their popups can blur the page and still rise over it; the
 expanded sidebar, which scrolls and opens no popup, blurs itself. Flat blurs only what the page scrolls under: the bar and the sticky
-cells, at fixed radii that Blur does not move. An engine without `color-mix()` and the printed page keep the solid theme.
+cells, at fixed radii that Blur does not move. The printed page keeps the solid theme.
 
 ### Ink is per palette AND per mode
 
@@ -192,6 +197,17 @@ traffic figures), `-xs` 11px (eyebrows, badges, tooltips), `--fs-type` 13px (bod
 fields), `-lg` 16px (section titles), `-xl` 20px (page titles), `-2xl` 26px (`h1`, third-party
 only). 13px is deliberate: a router UI is dense tables of addresses and counters.
 
+The steps are written in rem (`--fs-type` is `.8125rem`), so the px above hold at the browser's
+default 16px and follow the reader's own font size (issue #88). The same goes for every length that
+holds text: the control heights, the menu's line heights, the label column, `--fs-field-max`, the
+shell geometry, field and dropdown widths, the table columns' flex bases, the chrome icons and the
+`@container` thresholds (a row folds when its text no longer fits, and that text is rem). The
+`@media` breakpoints stay px.
+Spacing, borders, radii and shadows stay px: a larger font asks for larger text, not more air, and
+the browser's zoom scales them anyway. `--fs-type-floor` stays px too, since iOS zooms on a field
+under 16 CSS px whatever the root size. The Text size axis sets `<html>`'s font-size as a share of
+the browser's (`--fs-text-size`), which moves all of them at once.
+
 Leading is a unitless `1.5`, so it re-resolves against each element's own size. On a 13px body that
 gives a 19.5px line box, so never size a box as `--fs-type * --fs-leading`; take the nearest
 `--fs-space` step.
@@ -239,7 +255,7 @@ Spacing: independent of the type scale, so a font-size change does not re-space 
 Control heights: `--fs-ctl-h-sm` (30px), `--fs-ctl-h` (38px, default) and `--fs-ctl-h-lg` (44px)
 are minimum heights for chrome controls (buttons, not fields). `--fs-control-h` is a field's height,
 derived: the text box (`--fs-type` × `--fs-leading`), plus `2 × --fs-space-1` of inset, plus two
-1px borders, rounded up to 32px at Normal density.
+1px borders, rounded up to 32px at Normal density. All four are rem (see Type).
 
 Density multiplies type, spacing and shell geometry through `--fs-density-type`,
 `--fs-density-space` and `--fs-density-box`. Compact is `.9` / `.65` / `.85`, Normal is `1` / `1` /
@@ -267,7 +283,7 @@ bands take `--fs-dim` at paint time, so a new palette gets a correct chevron for
 
 ## The appearance axes
 
-`fs-appearance.js` builds the controls. `view/footstrap/appearance.js` dispatches them at
+`view/footstrap/appearance.js` builds the controls and is dispatched at
 System → Footstrap (`admin/system/footstrap`, registered in
 `root/usr/share/luci/menu.d/luci-theme-footstrap.json`, ACL-gated like any `luci-app-*` page). The
 entry exists while the package is installed, whichever theme is active; see
@@ -277,7 +293,7 @@ The values live in `fs-axes.js` (`fs-prefs.js` for dark mode, layout, auto-colla
 page groups them in four tabs, LuCI's own `ui.tabs`, with the Saving card under them:
 
 - Colour scheme: Mode, Palette, Accent.
-- Interface: Layout, Submenus, Density, Content width, Rounding.
+- Interface: Layout, Submenus, Density, Text size, Content width, Rounding.
 - Background: Tint and its strength, Wallpaper, Pattern and its three axes, File and Dim, then
   Transparency (Card opacity, Menu opacity, Material, Blur), shown only under a wallpaper.
 - Colours: Good, Warning, Danger and the four surface axes.
@@ -304,11 +320,16 @@ page groups them in four tabs, LuCI's own `ui.tabs`, with the Saving card under 
 | Blur | 0–200%, default 100; Frosted and Acrylic | `fs-blur` | `--fs-blur` |
 | Rounding | 0–20px, default 12 | `fs-radius` | `--fs-radius-base` |
 | Content width | 1280–3840px, default 1280 | `fs-content-width` | `--fs-content-max` |
+| Text size | 80–150%, default 100 | `fs-text-size` | `--fs-text-size` (`<html>`'s font-size) |
 | Submenus | keep open / auto-collapse | `fs-menu-autocollapse` | none |
 
 Content width (issue #44) writes a px length onto `--fs-content-max`. 1280 is the width every page
 was designed against, so the axis only widens, and `--fs-content-min` stays out of reach. 3840
 stands for "uncapped". The slider steps by 40px.
+
+Text size (issue #88) writes a percentage onto `--fs-text-size`, which is `<html>`'s font-size, so
+every rem token follows it on top of the browser's own font size. It steps by 5%, applies on
+release like Content width (the page grows under the pointer), and re-runs the fit.
 
 Photo dim is the scrim over a `file` wallpaper; the three Pattern axes do the same for the tiled
 SVG. The images' bytes live on the router; how a browser draws them is an ordinary axis.
@@ -357,7 +378,7 @@ The effective value of every axis is `localStorage` ?? router default ?? built-i
 
 Every applier therefore stores its choice explicitly, the off or default value included. Once a
 router default exists, a missing key means "inherit the router default", so deleting the key could
-not express "the built-in, not the router default". `lsDel` is reserved for Reset to default.
+not express "the built-in, not the router default". `lsDel` is reserved for Reset to router.
 
 ### Nothing else writes to the router
 
@@ -373,7 +394,7 @@ Every axis is implemented twice: inline in `partials/head.ut` before first paint
 does not exist yet, and live in `fs-axes.js` (`fs-prefs.js` for dark mode, layout, auto-collapse
 and rail). The JS is the contract and the template follows it. They agree on keys, `:root` attributes,
 custom properties and ranges. They agree on every slider's limits and default (JS, pre-paint,
-`_sd_range`, CSS token). They follow one ordering rule: custom property first, attribute second. Reversed, a reload paints one frame in
+the sanitiser's range table, CSS token). They follow one ordering rule: custom property first, attribute second. Reversed, a reload paints one frame in
 the previous hue.
 
 ### The colour axes, and why the slider went

@@ -1,9 +1,8 @@
 {
   "name": "luci-theme-footstrap-tooling",
   "private": true,
-  "description": "Build and test tooling. No package here is installed on a router, but uglify-js and acorn minify the shipped JS and templates in tools/stage.sh, which builds the released package.",
+  "description": "Build and test tooling. No package here is installed on a router, but lightningcss, uglify-js and acorn minify the shipped CSS, JS and templates in tools/stage.sh, which builds the released package.",
   "scripts": {
-    "e2e": "node tools/e2e.mjs",
     "devkit": "node tools/devkit-build.mjs",
     "changelog": "node tools/changelog.mjs",
     "playground:capture": "node tools/playground/capture.mjs",
@@ -12,6 +11,7 @@
   },
   "devDependencies": {
     "acorn": "8.19.0",
+    "lightningcss": "1.33.0",
     "playwright": "^1.64.1",
     "uglify-js": "3.19.3"
   }

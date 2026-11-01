@@ -122,6 +122,45 @@ function directives(src) {
 	return out.join('\n');
 }
 
+/* `_(x, 'footstrap')` -> `__fsT(x)` through one wrapper per file: the context literal is 12 B a
+ * call, 82 calls in appearance.js. Done here, not in the source, because update-po.sh's
+ * i18n-scan.pl extracts only the literal `_('…', 'footstrap')` form. `_` is never bound in a theme
+ * file (the wrapper reserves it), so the wrapper reads the same global, at call time. */
+const CTX_NAME = '__fsT';
+const callsTo = (ast, name, ctx) => {
+	const out = [];
+	walkAst(ast, (n) => {
+		if (n.type === 'CallExpression' && n.callee.type === 'Identifier' && n.callee.name === name &&
+		    (!ctx || (n.arguments.length === 2 && n.arguments[0].type !== 'SpreadElement' &&
+		              n.arguments[1].type === 'Literal' && n.arguments[1].value === ctx)))
+			out.push(n);
+	});
+	return out;
+};
+function hoistContext(src) {
+	if (src.includes(CTX_NAME)) throw new Error(`${CTX_NAME} is already used`);
+	const ast = acorn.parse(src, ACORN);
+	const sites = callsTo(ast, '_', 'footstrap');
+	/* below 3 calls the wrapper costs more than it saves */
+	if (sites.length < 3) return src;
+	let out = src, last = Infinity;
+	for (const n of sites.sort((a, b) => b.start - a.start)) {
+		/* a nested site would be cut at offsets the inner edit already moved */
+		if (n.end > last) throw new Error('nested _(…, \'footstrap\') calls');
+		out = out.slice(0, n.start) + CTX_NAME + out.slice(n.callee.end, n.arguments[0].end) + out.slice(n.arguments[1].end);
+		last = n.start;
+	}
+	const prologueEnd = ast.body.find((s) => !(s.type === 'ExpressionStatement' && s.expression.type === 'Literal' &&
+		typeof s.expression.value === 'string')).start;
+	/* every site sits after the prologue, so its offset is unchanged by the edits above */
+	out = out.slice(0, prologueEnd) + `const ${CTX_NAME} = (s) => _(s, 'footstrap');\n` + out.slice(prologueEnd);
+	/* self-check: the wrapper is the one context call left, and every site now calls it */
+	const check = acorn.parse(out, ACORN);
+	if (callsTo(check, '_', 'footstrap').length !== 1 || callsTo(check, CTX_NAME).length !== sites.length)
+		throw new Error('the context rewrite lost or duplicated a call');
+	return out;
+}
+
 let before = 0, after = 0, failed = 0;
 for (const f of files) {
 	const name = basename(f);
@@ -130,7 +169,7 @@ for (const f of files) {
 	/* the two halves of "names this scope already has": what the file reads without binding, and
 	 * what the LuCI wrapper binds for it whether it reads them or not */
 	const free = new Set([ ...freeNames(src), ...wrapperParams(src) ]);
-	const res = minify(src, {
+	const res = minify(hoistContext(src), {
 		/* a LuCI resource is a function body, not a module; webkit and v8 switch on uglify-js's
 		 * workarounds for Safari and Chrome engine bugs, which a router's admin browser can be */
 		module: false, webkit: true, v8: true, toplevel: true,

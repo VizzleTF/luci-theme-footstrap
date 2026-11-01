@@ -15,7 +15,7 @@ colours, wallpaper, transparency) apply without a reload.
 ## Install
 
 Needs OpenWrt 24.10.3 or newer: earlier 24.10 releases lack a LuCI widget the theme uses. The
-browser must be Chrome 108, Firefox 101, Safari 15.4 or newer. On 23.05 the installer installs
+browser must be Chrome 120, Firefox 121, Safari 17.2 or newer. On 23.05 the installer installs
 0.14.2: later versions use a LuCI widget that 23.05 lacks.
 
 Run as root on the router, over SSH:

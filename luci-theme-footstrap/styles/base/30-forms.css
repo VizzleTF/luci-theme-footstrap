@@ -38,7 +38,7 @@
 	/* size + ink: theme/60-inputs.css (.cbi-value-title) — absorbed. Left: label column geometry. */
 	.cbi-value label.cbi-value-title {
 		padding-top: var(--fs-space-1); /* lands the label's first baseline on the field's */
-		flex: 0 0 180px; /* column WIDTH (longest option label), not on the 4px step scale */
+		flex: 0 0 11.25rem; /* column WIDTH (longest option label), not on the 4px step scale */
 		text-align: end; /* towards the field — not base/95-luci.css's physical .left/.right/.center */
 		/* docs/css.md "Forms: the label column's min-width: 0 survives the responsive layer" —
 		 * stated here, not in theme/90-responsive.css. */
@@ -85,9 +85,8 @@
 		content: "×";
 		position: absolute;
 		align-items: center;
-		top: -1px;
+		inset-block: -1px;
 		inset-inline-end: -1px;
-		bottom: -1px;
 		font-weight: var(--fs-weight-bold);
 		pointer-events: auto;
 	}
@@ -145,7 +144,6 @@
 	.cbi-dropdown[disabled]:not(.btn):not(.cbi-button) {
 		opacity: var(--fs-disabled-opacity);
 		pointer-events: none;
-		cursor: default;
 	}
 
 	/* readonly border fade: theme/60-inputs.css — absorbed with the generic box */
@@ -189,15 +187,5 @@
 	.actions .secondary-action a,
 	.cbi-page-actions .secondary-action a {
 		line-height: var(--fs-control-h);
-	}
-
-	.actions .secondary-action a:hover,
-	.cbi-page-actions .secondary-action a:hover {
-		text-decoration: underline;
-	}
-
-	.cbi-page-actions > form {
-		display: inline;
-		margin: 0;
 	}
 }

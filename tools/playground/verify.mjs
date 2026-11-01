@@ -149,7 +149,7 @@ async function checkSpaNav(context, serverBase, fail) {
 	await page.waitForTimeout(SETTLE_MS);
 
 	/* Waited for past the settle: a loaded runner draws the menu late, not never. The router is
-	 * wired in the same turn that draws it (menu-footstrap-common.js). */
+	 * wired in the same turn that draws it (menu-footstrap.js). */
 	const link = await page.waitForFunction(() => Array.from(document.querySelectorAll('a[href]'))
 		.find((a) => (a.getAttribute('href') || '').endsWith('/footstrap')), null, { timeout: VIEW_TIMEOUT_MS })
 		.catch(() => null);
@@ -168,7 +168,7 @@ async function checkSpaNav(context, serverBase, fail) {
 	await page.close();
 }
 
-/* fs-appearance.js's `selectCtl` puts `aria-label` on the inner `<select>` (a stock widget's
+/* view/footstrap/appearance.js's `selectCtl` puts `aria-label` on the inner `<select>` (a stock widget's
  * wrapper div cannot carry a name), so the Palette control is found by that label. */
 async function checkPalette(context, serverBase, fail) {
 	const page = await context.newPage();

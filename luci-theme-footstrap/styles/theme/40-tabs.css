@@ -2,10 +2,8 @@
 	/* one component, three LuCI selectors, no markup difference worth honouring: #tabmenu ul.tabs
 	 * (page tabs), .tabs (view tabs), .cbi-tabmenu (CBI form tabs, the mode switcher included).
 	 * Active marker: .active on ul.tabs, .cbi-tab on every .cbi-tabmenu flavour. */
-	#tabmenu { margin-bottom: 0; }
 
 	/* the card */
-	#tabmenu ul.tabs,
 	.tabs,
 	.cbi-tabmenu {
 		display: flex;
@@ -30,31 +28,20 @@
 		box-shadow: none;
 	}
 
-	#tabmenu ul.tabs > li,
 	.tabs > li,
 	.cbi-tabmenu > li {
 		height: auto;
 		margin: 0; padding: 0;
 		border: 0; background: none;
 		border-radius: var(--fs-radius);
-		color: var(--fs-dim);
 	}
 
-	/* page tabs and the mode switcher never carry a sentence-length label; ul.cbi-tabmenu.mode > li
-	 * wins specificity over .cbi-tabmenu > li below, so mode pills stay none regardless of order */
-	#tabmenu ul.tabs > li,
-	ul.cbi-tabmenu.mode > li,
-	.tabs > li {
-		max-width: none;
-	}
-
-	/* CBI form tabs only, not the mode switcher: a long label overflowed its column by 28.6px at
-	 * 320px/Large, EN measured 0 */
-	.cbi-tabmenu > li {
+	/* CBI form tabs only, not the mode switcher (page tabs and mode pills never carry a
+	 * sentence-length label): a long label overflowed its column by 28.6px at 320px/Large, EN measured 0 */
+	.cbi-tabmenu:not(.mode) > li {
 		max-width: 100%;
 	}
 
-	#tabmenu ul.tabs > li > a,
 	.tabs > li > a,
 	.cbi-tabmenu > li > a {
 		display: block;
@@ -69,7 +56,6 @@
 		transition: background var(--fs-dur), color var(--fs-dur);
 	}
 
-	#tabmenu ul.tabs > li > a:hover,
 	.tabs > li > a:hover,
 	.cbi-tabmenu > li > a:hover {
 		background: var(--fs-accent-soft);
@@ -77,12 +63,6 @@
 	}
 
 	/* active pill */
-	#tabmenu ul.tabs > li.active,
-	.tabs > li.active,
-	.cbi-tabmenu > li.cbi-tab {
-		color: var(--fs-on-accent);
-	}
-	#tabmenu ul.tabs > li.active > a,
 	.tabs > li.active > a,
 	.cbi-tabmenu > li.cbi-tab > a {
 		background: var(--fs-accent);
@@ -93,7 +73,6 @@
 	/* one ring for both states, on --fs-focus-ring-solo: base's outline is invisible on the active
 	 * pill, whose background is the same accent. box-shadow, not outline, because the strip clips
 	 * and a shadow is not */
-	#tabmenu ul.tabs > li > a:focus-visible,
 	.tabs > li > a:focus-visible,
 	.cbi-tabmenu > li > a:focus-visible {
 		outline: none;
@@ -102,7 +81,6 @@
 
 	/* fitTabStrips (fs-chrome.js) escalates dense1 -> dense2 on wrap; for tabs both are the same
 	 * pill padding (gap and font-size already equal the base), so one list serves both */
-	#tabmenu ul.tabs:is(.fs-dense1, .fs-dense2) > li > a,
 	.tabs:is(.fs-dense1, .fs-dense2) > li > a,
 	.cbi-tabmenu:is(.fs-dense1, .fs-dense2) > li > a { padding: var(--fs-space-1) var(--fs-space-2); }
 

@@ -3,7 +3,7 @@
 #   ./mangle-tokens.sh <cascade.css> <rewrite-dir>...
 #
 # Run from the Makefile and tools/stage.sh over a BUILD tree only, never the checkout. The names are
-# 14% of the sheet: 18283 of 134210 bytes (measured 2026-10-14), wire bytes too: uhttpd serves /www
+# 14% of the sheet: 20036 of 142380 bytes (measured 2026-10-31), wire bytes too: uhttpd serves /www
 # uncompressed.
 # The same map rewrites the .js and .ut under each <rewrite-dir> in place, BEFORE `strip-build.sh
 # templates` and the JS minifier.

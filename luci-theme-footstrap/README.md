@@ -31,7 +31,7 @@ build-css.sh                      styles/ → htdocs/luci-static/footstrap/casca
 po/                               translation catalogue (Weblate translates this)
 ucode/template/themes/footstrap/  header.ut, footer.ut, sysauth.ut, partials/
 htdocs/luci-static/footstrap/     cascade.css (generated), logo.svg; no webfonts, no wallpaper
-htdocs/luci-static/resources/     menu-footstrap*.js, fs-*.js, view/footstrap/appearance.js
+htdocs/luci-static/resources/     menu-footstrap.js, fs-*.js, view/footstrap/appearance.js
 root/                             uci-defaults, the conffile, menu.d, the ACL, keep.d, the pattern CGI
 ```
 

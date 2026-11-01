@@ -13,7 +13,7 @@
  *      (crawl() below says what fails a page); then tools/anchor-check.mjs: a poll tick that grows
  *      the page above a parked reader leaves them where they were, in Chromium, Firefox and WebKit
  *      (--no-anchor leaves it out: CI runs it as a job of its own, on a router of its own)
- *   5. remove the package                          -> LuCI falls back to bootstrap and still serves
+ *   5. remove the package                          -> no file left in /www, LuCI falls back to bootstrap and still serves
  *   6. install this build again                    -> offered, active theme left alone
  *
  * No list of expected problems: the stock theme on the same router is the reference.
@@ -634,6 +634,7 @@ try {
 	const rmOut = remove();
 	check('the package removes', installedVersion() === '', rmOut.split('\n').slice(-1)[0]);
 	check('removal falls back to bootstrap', theme() === '/luci-static/bootstrap', theme());
+	check('removal leaves no footstrap files in /www', sh('[ -e /www/luci-static/footstrap ] && ls -A /www/luci-static/footstrap || echo none') === 'none');
 	const form = await loginForm();
 	/* silence after the removal is the stand's only when it was silent before it too: a stand that
 	 * answered the control and then stopped may have been stopped by the removal */

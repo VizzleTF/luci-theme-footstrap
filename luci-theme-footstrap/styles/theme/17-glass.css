@@ -11,10 +11,8 @@
 	 *
 	 * [data-glass] / [data-glass-bar] are set by fs-axes.js and head.ut only below 100% and only when
 	 * the OS asks for neither less transparency nor more contrast; [data-wallpaper] is the gate here.
-	 * screen: paper gets the solid print palette. @supports: without color-mix every glass token is
-	 * invalid at use and a card would paint nothing, so an old engine keeps the solid theme. */
+	 * screen: paper gets the solid print palette. */
 	@media screen {
-	@supports (color: color-mix(in srgb, red 50%, transparent)) {
 
 	/* ---------- the glass tokens, resolved once on :root ---------- */
 	:root[data-wallpaper]:is([data-glass], [data-glass-bar]) {
@@ -60,7 +58,7 @@
 		--fs-glass-blur-base: 54px;
 		--fs-glass-sat: 1.8;
 		/* the inner url( is percent-encoded: tools/devkit-build.mjs refuses a url( that is not a data URI */
-		--fs-glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23n%29'/%3E%3C/svg%3E");
+		--fs-glass-noise: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .07 0'/></filter><rect width='100%25' height='100%25' filter='url%28%23n%29'/></svg>");
 	}
 
 	/* ---------- cards ---------- */
@@ -72,7 +70,7 @@
 	}
 	/* everything that paints --fs-panel in flow */
 	:root[data-wallpaper][data-glass] :where(.cbi-section, .cbi-map > .cbi-section-node, .panel, .fs-login,
-		.alert-message:not(.btn), #tabmenu ul.tabs, .tabs, .cbi-tabmenu, .cbi-map > h2, #view > h2,
+		.alert-message:not(.btn), .tabs, .cbi-tabmenu, .cbi-map > h2, #view > h2,
 		h2 + .cbi-map-descr, .table, .ifacebox, .cbi-filebrowser, .cbi-dynlist > .item,
 		:where(#view)[data-page="admin-system-admin-sshkeys"] > div) > * {
 		--fs-glass-here: transparent;
@@ -83,7 +81,7 @@
 	/* same specificity (:where), so source order decides: after the rule above, a card that is a
 	 * card's direct child reads its own --fs-glass-here, transparent */
 	:root[data-wallpaper][data-glass] :where(.cbi-section, .cbi-map > .cbi-section-node, .panel, .fs-login,
-		.alert-message:not(.btn), #tabmenu ul.tabs, .tabs, .cbi-tabmenu, .cbi-map > h2, #view > h2,
+		.alert-message:not(.btn), .tabs, .cbi-tabmenu, .cbi-map > h2, #view > h2,
 		h2 + .cbi-map-descr, .table, .ifacebox, .cbi-filebrowser, .cbi-dynlist > .item,
 		:where(#view)[data-page="admin-system-admin-sshkeys"] > div) {
 		--fs-panel: var(--fs-glass-here);
@@ -97,7 +95,7 @@
 	}
 	/* the checked pill of a radio row (pages/80-appearance.css) is raised as a card, not a hole */
 	:root[data-wallpaper][data-glass] .fs-seg input:checked + span { --fs-panel: var(--fs-glass-card); }
-	@container fs-content (max-width: 992px) {
+	@container fs-content (max-width: 62rem) {
 		:root[data-wallpaper][data-glass] .table.cbi-section-table .tr > * { --fs-panel2: transparent; }
 	}
 
@@ -106,12 +104,10 @@
 	:root[data-wallpaper][data-glass] #view .table.fs-dt:not(.fs-stacked) .tr.table-titles .th {
 		background-color: var(--fs-glass-stuck);
 		background-image: linear-gradient(var(--fs-panel2), var(--fs-panel2));
-		-webkit-backdrop-filter: blur(12px);
 		backdrop-filter: blur(12px);
 	}
 	:root[data-wallpaper][data-glass] #view .table.fs-xscroll :is(.tr, tr) > :first-child {
 		--fs-panel: var(--fs-glass-stuck);
-		-webkit-backdrop-filter: blur(12px);
 		backdrop-filter: blur(12px);
 	}
 
@@ -132,7 +128,7 @@
 	/* floating surfaces cover other text: the solid palette, for them and everything inside, glass
 	 * tokens included, so a card inside a modal is solid too */
 	:root[data-wallpaper][data-glass] :where(#modal_overlay, .modal, .cbi-tooltip, .fs-search-box,
-		.cbi-dropdown[open] > ul.dropdown, .dropdown-menu, .fs-sidebar ul.nav ul, .fs-sidebar) {
+		.cbi-dropdown[open] > ul.dropdown, .dropdown-menu, .fs-sidebar) {
 		--fs-panel: var(--fs-glass-o-panel);
 		--fs-panel2: var(--fs-glass-o-panel2);
 		--fs-track: var(--fs-glass-o-track);
@@ -148,7 +144,6 @@
 		:is(.cbi-section, .cbi-map > .cbi-section-node, .panel, .fs-login, .alert-message:not(.btn), #tabmenu ul.tabs,
 			.tabs, .cbi-tabmenu, .cbi-map > h2, #view > h2, h2 + .cbi-map-descr, .table):not(:is(.cbi-section,
 			.cbi-section-node, .panel, .fs-login, .alert-message, .table, .tabs, .ifacebox, #modal_overlay) *) {
-		-webkit-backdrop-filter: blur(var(--fs-glass-blur)) saturate(var(--fs-glass-sat));
 		backdrop-filter: blur(var(--fs-glass-blur)) saturate(var(--fs-glass-sat));
 	}
 	/* a blurred card is a stacking context: the one in use is lifted, so its open list or tooltip is
@@ -182,14 +177,6 @@
 		--fs-border: var(--fs-glass-line);
 		--fs-hairline: 1px solid var(--fs-glass-line);
 	}
-	/* its popups (bar dropdowns, rail flyouts) are the menu too: the bar's glass, not the solid
-	 * palette the floating surfaces above take back */
-	:root[data-wallpaper][data-glass-bar] .fs-sidebar ul.nav ul {
-		--fs-panel: var(--fs-glass-bar-panel);
-		--fs-panel2: var(--fs-glass-bar-inset);
-		--fs-border: var(--fs-glass-line);
-		--fs-hairline: 1px solid var(--fs-glass-line);
-	}
 	/* The blur sits on a layer under the menu, not on the menu: a backdrop-filtered bar is the backdrop
 	 * root of its own popups, which then blur nothing (Chromium), and it is a stacking context that
 	 * buries the rail's flyouts under the page. The bar's colour moves onto the layer, over the blur. */
@@ -201,14 +188,12 @@
 	:root[data-wallpaper][data-glass-bar]:is([data-layout="top"], [data-narrow]) .fs-sidebar::before { background-color: var(--fs-bar-bg); }
 	:root[data-wallpaper][data-glass-bar]:not([data-material="flat"]) .fs-sidebar::before,
 	:root[data-wallpaper][data-glass-bar]:not([data-material="flat"]) .fs-sidebar ul.nav ul {
-		-webkit-backdrop-filter: blur(var(--fs-glass-blur)) saturate(var(--fs-glass-sat));
 		backdrop-filter: blur(var(--fs-glass-blur)) saturate(var(--fs-glass-sat));
 	}
 	/* what covers the page's text is blurred in Flat too, plainly and at the base radius, as Flat has
 	 * no Blur slider: the bar the page scrolls under, and every popup */
 	:root[data-wallpaper][data-glass-bar][data-material="flat"]:is([data-layout="top"], [data-narrow]) .fs-sidebar::before,
 	:root[data-wallpaper][data-glass-bar][data-material="flat"] .fs-sidebar ul.nav ul {
-		-webkit-backdrop-filter: blur(var(--fs-glass-blur-base));
 		backdrop-filter: blur(var(--fs-glass-blur-base));
 	}
 	/* the rail's name bubbles are labels over the page, not menus: solid */
@@ -220,20 +205,17 @@
 	@media (min-width: 521px) {
 		/* the rail is static: the layer needs it as its containing block, and no z-index, so the
 		 * flyouts still rise over the page on their own (20-shell.css, issue #7) */
-		:root[data-wallpaper][data-glass-bar][data-layout="sidebar"][data-rail="true"]:not([data-narrow]) .fs-sidebar { position: relative; }
+		:root[data-wallpaper][data-glass-bar][data-sb][data-rail] .fs-sidebar { position: relative; }
 		/* the expanded sidebar scrolls, which a layer would scroll with, and opens no popup: the blur
 		 * goes back on the column itself, and its accordion is the panel, not a popup over it */
-		:root[data-wallpaper][data-glass-bar][data-layout="sidebar"]:not([data-narrow]):not([data-rail="true"]) .fs-sidebar::before { content: none; }
-		:root[data-wallpaper][data-glass-bar][data-layout="sidebar"]:not([data-narrow]):not([data-rail="true"]):not([data-material="flat"]) .fs-sidebar {
-			-webkit-backdrop-filter: blur(var(--fs-glass-blur)) saturate(var(--fs-glass-sat));
+		:root[data-wallpaper][data-glass-bar][data-sb]:not([data-rail]) .fs-sidebar::before { content: none; }
+		:root[data-wallpaper][data-glass-bar][data-sb]:not([data-rail]):not([data-material="flat"]) .fs-sidebar {
 			backdrop-filter: blur(var(--fs-glass-blur)) saturate(var(--fs-glass-sat));
 		}
-		:root[data-wallpaper][data-glass-bar][data-layout="sidebar"]:not([data-narrow]):not([data-rail="true"]) .fs-sidebar ul.nav ul {
-			-webkit-backdrop-filter: none;
+		:root[data-wallpaper][data-glass-bar][data-sb]:not([data-rail]) .fs-sidebar ul.nav ul {
 			backdrop-filter: none;
 		}
 	}
 
-	}
 	}
 }

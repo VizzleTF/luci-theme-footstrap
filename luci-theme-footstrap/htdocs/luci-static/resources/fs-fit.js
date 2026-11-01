@@ -42,9 +42,8 @@ function run(records) {
  * document that was never that short. Written before the tick (a pin in the same statement
  * sequence is never laid out: 1882px still clamped away) and on the containers, never the column,
  * where it suppresses the engine's own anchoring (css-scroll-anchoring-1 §2.2.2) and cost 120px of
- * growth, all 120px. The selector is `dom.content()`'s own three: a section body, a table, and a
- * table's body — the third was missing and a poll emptying it took 58px from under the reader on
- * 24.10's Overview. */
+ * growth, all 120px. The selector covers what `dom.content()` empties: a section body and a table
+ * (a table's body climbs to the same box). */
 const SHRINKS = '.cbi-section > div, .table';
 
 const FLOORED = '[data-fs-floor]';
@@ -55,7 +54,7 @@ const FLOORED = '[data-fs-floor]';
 function holdFloor(records) {
 	if (scrolling() || !fittersEnabled()) return;
 	const host = document.getElementById('view');
-	if (!host) return;			/* the login page has no view */
+	if (!host) return;			/* a call, cbi or template page has no #view */
 	const boxes = new Set();
 	host.querySelectorAll(SHRINKS).forEach((el) => {
 		let box = el, cs = window.getComputedStyle(el);
@@ -248,10 +247,7 @@ function watch(el) {
  * them by all of it. Whether the engine anchors is asked of the platform, never of a browser name;
  * where it does, the observer leaves the reader to it. Elsewhere the drift is computed from a
  * reference element, never from the offset. */
-const ENGINE_ANCHORS = (() => {
-	try { return CSS.supports('overflow-anchor', 'auto'); }
-	catch (e) { return true; }
-})();
+const ENGINE_ANCHORS = CSS.supports('overflow-anchor', 'auto');
 
 let _rest = null;
 let _restAt = null, _restPage = null;
@@ -259,7 +255,7 @@ let _restAt = null, _restPage = null;
  * one lost the lease table's 172px. */
 const _deferredFloors = new Set();
 function pageStamp() {
-	return (document.body && document.body.getAttribute('data-page')) || '';
+	return document.body.getAttribute('data-page') || '';
 }
 function forgetRest() {
 	_rest = null;

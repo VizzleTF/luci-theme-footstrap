@@ -89,8 +89,8 @@ packages:
     # changes with every commit and belongs in CI, not in a committed file.
     repo-commit: env:GITHUB_SHA
 
-    # /etc/config/footstrap ships as a stub and is WRITTEN AT RUNTIME by Appearance -> "Save as
-    # default". Undeclared, the package manager owns it as an ordinary file and replaces it on
+    # /etc/config/footstrap ships as a stub and is WRITTEN AT RUNTIME by Appearance -> "Save to
+    # router". Undeclared, the package manager owns it as an ordinary file and replaces it on
     # upgrade, so the theme's own one-click Update wipes the admin's saved defaults and reports
     # success. Any future root/etc/config/* goes here too.
     conffiles: ["/etc/config/footstrap"]

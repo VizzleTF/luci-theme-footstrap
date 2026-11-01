@@ -9,17 +9,13 @@
 	}
 
 	/* border-color: theme/60-inputs.css — absorbed. */
-	.cbi-input-invalid,
-	.cbi-input-invalid.cbi-dropdown:not([open]) > ul > li {
-		color: var(--fs-danger);
-	}
+	.cbi-input-invalid { color: var(--fs-danger); }
 
 	/* Not a clearfix — flex container, nothing floats: docs/css.md "Buttons: the flex clearfix,
 	 * and why float is dead on .cbi-page-actions". */
 	.cbi-page-actions::after {
 		display: table;
 		content: "";
-		clear: both;
 	}
 
 	.cbi-page-actions > :not([method="post"]):not(.cbi-button-apply):not(.cbi-button-negative):not(.cbi-button-save):not(.cbi-button-reset) {

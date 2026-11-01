@@ -10,13 +10,12 @@
 	/* moved from base: width:100% loses to the 210px generic box by layer */
 	.modal > pre,
 	.modal > textarea {
-		white-space: pre-wrap;
 		overflow: auto;
 		width: 100%;
 	}
 
 	/* 600px is cramped for a table form (.cbi-map cards on a big screen); vw widens toward 1100 on desktop only */
-	.modal:has(.cbi-map) { max-width: min(1100px, 94vw); }
+	.modal:has(.cbi-map) { max-width: min(68.75rem, 94vw); }
 
 	/* no HORIZONTAL scroll ever (measured 634px scroll vs 530px room) — docs/css.md "Modal: no horizontal scroll, ever" */
 	#modal_overlay .modal label.btn {

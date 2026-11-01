@@ -18,7 +18,7 @@
 	 * landscape ~380px), and a position:fixed popup cannot be scrolled by the page */
 	.fs-search-box {
 		display: flex; flex-direction: column; min-height: 0;
-		width: 100%; max-width: 560px; max-height: min(70dvh, 560px);
+		width: 100%; max-width: 35rem; max-height: min(70dvh, 35rem);
 		background: var(--fs-panel);
 		border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow-pop);
@@ -31,7 +31,7 @@
 		border-bottom: var(--fs-hairline);
 	}
 	.fs-search-ico { display: inline-flex; color: var(--fs-faint); }
-	.fs-search-ico .fs-ico { width: 18px; height: 18px; }
+	.fs-search-ico .fs-ico { width: 1.125rem; height: 1.125rem; }
 	/* the ROW is the field, the input carries no frame of its own — two classes (0,2,0) needed to
 	 * outrank 60-inputs.css's generic field box (0,1,1) in the same layer regardless of source
 	 * order. --fs-type-floor at every width, not the body size: below 16px iOS Safari zooms the page

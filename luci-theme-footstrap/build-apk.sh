@@ -12,7 +12,7 @@ set -eu
 # Release and gcc string are baked into the SDK filename and downloads.openwrt.org keeps only the
 # current point release, so this goes stale: keep it at owfeed.lock's 25.12 `point:`. Override with
 # OPENWRT_RELEASE and OPENWRT_SDK_FILE.
-REL="${OPENWRT_RELEASE:-25.12.5}"
+REL="${OPENWRT_RELEASE:-25.12.6}"
 SDK_BASE="https://downloads.openwrt.org/releases/${REL}/targets/mediatek/filogic"
 SDK_FILE="${OPENWRT_SDK_FILE:-openwrt-sdk-${REL}-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst}"
 SDK_URL="$SDK_BASE/$SDK_FILE"
@@ -88,7 +88,7 @@ rm -rf "$DEST"
 cp -a "$THEME_DIR" "$DEST"
 # a worktree can hold 0600/0700 (git stores 100644); uhttpd answers 403 on a file that is not world-readable
 chmod -R u=rwX,go=rX "$DEST"
-rm -rf "$DEST/build-apk.sh" "$DEST/dev-sync.sh" "$DEST/.git" 2>/dev/null || true
+rm -rf "$DEST/build-apk.sh" "$DEST/dev-sync.sh" 2>/dev/null || true
 
 ./scripts/feeds update -i luci
 ./scripts/feeds install luci-theme-footstrap

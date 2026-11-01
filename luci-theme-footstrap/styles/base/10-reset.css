@@ -34,6 +34,7 @@
 
 	html {
 		height: 100%;
+		font-size: var(--fs-text-size);
 	}
 
 	/* :focus-visible: UA heuristic keeps the ring off a mouse click. */
@@ -73,7 +74,7 @@
 		appearance: button;
 	}
 
-	/* disabled-opacity fade: 30-forms.css, same elements + pointer-events/cursor */
+	/* disabled-opacity fade: 30-forms.css, same elements + pointer-events */
 
 	input[type="search"] {
 		appearance: textfield; /* not content-box: contradicts border-box above, ~22px too wide */

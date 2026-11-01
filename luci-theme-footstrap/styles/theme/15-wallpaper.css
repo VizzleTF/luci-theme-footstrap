@@ -24,11 +24,8 @@
 	 * design-system.md, "The appearance axes". */
 	:root[data-wallpaper="pattern"]:not([data-pattern-ink="original"]) .fs-pattern {
 		background-color: var(--fs-text);
-		-webkit-mask-image: var(--fs-pattern-url);
 		mask-image: var(--fs-pattern-url);
-		-webkit-mask-repeat: repeat;
 		mask-repeat: repeat;
-		-webkit-mask-size: var(--fs-pattern-size) auto;
 		mask-size: var(--fs-pattern-size) auto;
 	}
 	/* original: the file's own palette, plain tiled background, no mask. */

@@ -19,20 +19,20 @@
 	 * so its `display` is declared there, not here, or it would just be shadowed. */
 	.fs-railtoggle {
 		align-items: center; justify-content: center;
-		width: calc(28px * var(--fs-density-box)); height: calc(28px * var(--fs-density-box));
+		width: calc(1.75rem * var(--fs-density-box)); height: calc(1.75rem * var(--fs-density-box));
 		padding: 0; flex: 0 0 auto;
 		border: 1px solid transparent; border-radius: var(--fs-radius-sm);
 		background: transparent; color: var(--fs-faint); cursor: pointer;
 		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
 	}
 	.fs-railtoggle:hover { color: var(--fs-text); background: var(--fs-panel2); border-color: var(--fs-border); }
-	.fs-railtoggle .fs-ico { width: 16px; height: 16px; transition: rotate var(--fs-dur-move); }
+	.fs-railtoggle .fs-ico { width: 1rem; height: 1rem; transition: rotate var(--fs-dur-move); }
 	/* base `ul` gives a 24px inline-start margin and a disc; padding is already 0 (reset) */
 	.fs-modemenu { list-style: none; margin: 0; }
 	.fs-sidebar ul.nav > li > a .fs-label { flex: 1 1 auto; }
 	/* collapse chevron for sections with children */
 	.fs-chevron {
-		width: 14px; height: 14px; flex: 0 0 auto;
+		width: .875rem; height: .875rem; flex: 0 0 auto;
 		color: var(--fs-dim);
 		transition: rotate var(--fs-dur-move);
 	}
@@ -60,7 +60,7 @@
 		display: flex;
 		width: 100%; height: auto;
 		position: sticky; top: 0; z-index: var(--fs-z-sticky);
-		flex-direction: row; flex-wrap: wrap; align-items: center;
+		flex-flow: wrap; align-items: center;
 		gap: var(--fs-space-2-5); padding: var(--fs-space-2-5) var(--fs-space-4);
 		background: var(--fs-bar-bg);
 		border-inline-end: 0; border-bottom: var(--fs-hairline);
@@ -83,7 +83,7 @@
 	.fs-sidebar ul.nav {
 		display: flex;
 		order: 3; flex: 1 1 100%;
-		flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--fs-space-0-5);
+		flex-flow: wrap; align-items: center; gap: var(--fs-space-0-5);
 	}
 	/* anchors the dropdown to its OWN item, not the bar — issue #19, chrome.md, "A bar dropdown
 	 * anchors to its own <li>". A phone never shows it: `hover: none` disables the rule. */
@@ -165,7 +165,6 @@
 	.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]::before {
 		content: ""; width: var(--fs-icon-refresh-sz); height: var(--fs-icon-refresh-sz);
 		background: var(--fs-good);
-		-webkit-mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
 		mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
 	}
 	.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]:not([data-style="active"])::before {
@@ -195,33 +194,32 @@
 	.fs-logout:hover { border-color: var(--fs-danger); }
 	.fs-themerow .fs-label, .fs-logout .fs-label { display: none; }
 	.fs-themerow .fs-ico,
-	.fs-logout .fs-ico { width: 18px; height: 18px; flex: 0 0 auto; }
+	.fs-logout .fs-ico { width: 1.125rem; height: 1.125rem; flex: 0 0 auto; }
 	.fs-sidebar ul.nav .fs-ico { flex: 0 0 auto; }
 
-	/* The vertical sidebar: the single override, guarded POSITIVELY (never `:not([data-layout=
-	 * …])`); everything the bar declared above must be answered here. The `data-narrow`
-	 * measurement and the 521px JS-disabled floor: chrome.md, "`data-narrow`". */
+	/* The vertical sidebar: the single override, guarded POSITIVELY by `[data-sb]` (sidebar layout,
+	 * not narrow; never `:not([data-layout=…])`); everything the bar declared above must be answered
+	 * here. The `data-narrow` measurement and the 521px JS-disabled floor: chrome.md, "`data-narrow`". */
 	@media (min-width: 521px) {
 		/* Static, never sticky (issue #7) — chrome.md, "A static sidebar, never position:
 		 * sticky". Confined here; the top layout and the phone bar keep window scrolling. */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-shell {
+		:root[data-sb] .fs-shell {
 			flex-direction: row; height: 100svh; overflow: hidden;
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-main {
+		:root[data-sb] .fs-main {
 			height: 100svh; overflow-y: auto;
 			/* Firefox-only overflow leak past the static sidebar (issue #12) — chrome.md,
 			 * "contain: paint … is the fix for issue #12". */
 			contain: paint;
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar {
+		:root[data-sb] .fs-sidebar {
 			width: var(--fs-sidebar-w); height: 100svh;
 			flex: 0 0 auto;
 			position: static;
-			flex-direction: column; flex-wrap: nowrap; align-items: normal;
+			flex-flow: column; align-items: normal;
 			gap: normal; padding: var(--fs-space-5) var(--fs-space-3-5);
 			background: var(--fs-panel);
 			border-inline-end: var(--fs-hairline); border-bottom: 0;
-			box-shadow: none;
 			/* `overflow: auto`, not overflow-y alone: the bar sets `overflow: visible` for its
 			 * popups, and a lone overflow-y here would leave overflow-x visible — which the
 			 * spec forces back to auto anyway. Say both. */
@@ -230,45 +228,45 @@
 		}
 		/* the column is already 224px wide — that IS the cap, so the bar's 30ch one must go
 		 * or the brand is capped twice, at the wrong value */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-brandrow {
+		:root[data-sb] .fs-brandrow {
 			display: flex; align-items: center; gap: var(--fs-space-1-5);
 			flex: 0 0 auto; order: 0; min-width: auto; max-width: none; padding-block: 0 var(--fs-space-5); padding-inline: var(--fs-space-2) var(--fs-space-1);
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-navlabel {
+		:root[data-sb] .fs-navlabel {
 			display: block;
 			color: var(--fs-dim);
 			font-size: var(--fs-type-xs); font-weight: var(--fs-weight-bold); letter-spacing: .1em;
 			text-transform: uppercase;
 			padding: var(--fs-space-1-5) var(--fs-space-2-5) var(--fs-space-2);
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-spacer { display: block; flex: 1 1 auto; min-height: 12px; }
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-railtoggle { display: inline-flex; }
+		:root[data-sb] .fs-spacer { display: block; flex: 1 1 auto; min-height: 12px; }
+		:root[data-sb] .fs-railtoggle { display: inline-flex; }
 		/* spacing only: whether the strip shows is the bar's :not(:empty):not(.single) rule above,
 		 * and the rail's hide below outranks it (0,5,0 vs 0,3,0). */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-modemenu { margin-top: var(--fs-space-1); }
+		:root[data-sb] .fs-modemenu { margin-top: var(--fs-space-1); }
 
 		/* vertical main nav */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav,
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar #modemenu {
+		:root[data-sb] .fs-sidebar ul.nav,
+		:root[data-sb] .fs-sidebar #modemenu {
 			order: 0; flex: 0 1 auto;
-			flex-direction: column; flex-wrap: nowrap; align-items: normal; gap: var(--fs-space-0-5);
+			flex-flow: column; align-items: normal; gap: var(--fs-space-0-5);
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li { position: relative; }
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a {
+		:root[data-sb] .fs-sidebar ul.nav > li { position: relative; }
+		:root[data-sb] .fs-sidebar ul.nav > li > a {
 			gap: var(--fs-space-3);
 			padding: var(--fs-space-2-5) var(--fs-space-3);
 			/* Bold is the root level's own signal (lightening children reads as hierarchy instead); only the accordion needs it. */
 			font-weight: var(--fs-weight-bold); white-space: normal;
 			line-height: 1.1;
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a .fs-ico,
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li > a .fs-chevron { display: block; }
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav .fs-ico,
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow .fs-ico,
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout .fs-ico { width: 17px; height: 17px; }
+		:root[data-sb] .fs-sidebar ul.nav > li > a .fs-ico,
+		:root[data-sb] .fs-sidebar ul.nav > li > a .fs-chevron { display: block; }
+		:root[data-sb] .fs-sidebar ul.nav .fs-ico,
+		:root[data-sb] .fs-themerow .fs-ico,
+		:root[data-sb] .fs-logout .fs-ico { width: 1.0625rem; height: 1.0625rem; }
 
 		/* nested submenu -> an inline accordion, not a popup */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav ul {
+		:root[data-sb] .fs-sidebar ul.nav ul {
 			display: none;
 			/* the bar anchors this panel under itself (absolute + top/left); an accordion is
 			 * just the next block in the column, so the offsets must go back to auto or they
@@ -283,21 +281,20 @@
 		}
 		/* the bar's hover bridge does not follow: static here, its containing block would fall
 		 * back to the <li> and swallow clicks above it. The rail brings its own (::after). */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub > ul::before { content: none; }
+		:root[data-sb] .fs-sidebar ul.nav > li.has-sub > ul::before { content: none; }
 		/* An open section is a GROUP: an indent alone does not say where it ends, and after ten
 		 * children the next root category read as an eleventh (issue #37). No :not([data-rail])
 		 * guard needed — the rail's own rule below restates these at higher specificity. */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.open > ul {
+		:root[data-sb] .fs-sidebar ul.nav > li.open > ul {
 			display: flex;
 			margin-block: var(--fs-space-1) var(--fs-space-3);
-			margin-inline: var(--fs-space-7) 0;
 			padding-inline-start: var(--fs-space-1);
 			border-inline-start: var(--fs-hairline);
 		}
 
 		/* Search and Log out are full-width text rows down here */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow,
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout {
+		:root[data-sb] .fs-themerow,
+		:root[data-sb] .fs-logout {
 			order: 0; margin-inline-start: 0;
 			width: 100%; height: auto;
 			justify-content: normal;
@@ -305,20 +302,20 @@
 			border: 0;
 			/* no background here: at (0,4,0) it would out-rank the (0,2,0) hover and open plates in 10-chrome.css */
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout { font-weight: var(--fs-weight); font-size: var(--fs-type); }
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout:hover { background: var(--fs-panel2); }
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow .fs-label,
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout .fs-label { display: block; flex: 1 1 auto; }
+		:root[data-sb] .fs-logout { font-weight: var(--fs-weight); }
+		:root[data-sb] .fs-logout:hover { background: var(--fs-panel2); }
+		:root[data-sb] .fs-themerow .fs-label,
+		:root[data-sb] .fs-logout .fs-label { display: block; flex: 1 1 auto; }
 
 		/* the poll pill sits in the sidebar footer, above Search */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar #indicators {
+		:root[data-sb] .fs-sidebar #indicators {
 			order: 0; margin-inline-start: 0;
 			padding: 0 var(--fs-space-1-5) var(--fs-space-1);
 		}
 		/* In the column the indicator is one of a stack of ROWS, not a row of buttons —
 		 * Search and Log out below it run the sidebar's full width, so a pill at its own
 		 * content width read as a stray chip. */
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar #indicators [data-indicator] {
+		:root[data-sb] .fs-sidebar #indicators [data-indicator] {
 			flex: 1 1 100%;
 			justify-content: center;
 		}
@@ -327,7 +324,7 @@
 		 * re-applied before paint by head.ut. Labels collapse and a section's submenu becomes a
 		 * flyout anchored at its icon's inline-end. Same block as the vertical sidebar, so the two guards
 		 * cannot drift — chrome.md, "The rail's guard must be the vertical sidebar's, exactly". */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar {
+		:root[data-sb][data-rail] .fs-sidebar {
 			width: var(--fs-rail-w); padding: var(--fs-space-5) var(--fs-space-2-5);
 			/* the default `overflow-y: auto` computes overflow-x to `auto` as well,
 			 * which would clip the flyouts; the rail is short enough not to scroll */
@@ -335,31 +332,31 @@
 			/* no z-index/sticky: static, like the vertical sidebar (issue #7) — its flyouts
 			 * still cover the content on their own --fs-z-flyout in the root stacking context. */
 		}
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-brandrow { flex-direction: column; gap: var(--fs-space-2-5); padding: 0 0 var(--fs-space-5); }
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-brand { flex: 0 0 auto; justify-content: center; }
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-railtoggle .fs-ico { rotate: 180deg; }
+		:root[data-sb][data-rail] .fs-brandrow { flex-direction: column; gap: var(--fs-space-2-5); padding: 0 0 var(--fs-space-5); }
+		:root[data-sb][data-rail] .fs-brand { flex: 0 0 auto; justify-content: center; }
+		:root[data-sb][data-rail] .fs-railtoggle .fs-ico { rotate: 180deg; }
 
 		/* only the rail's own labels collapse — a `.fs-label` also exists on every
 		 * submenu link, and those live inside the flyout where they must stay */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-wordmark,
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-navlabel,
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-modemenu,
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > a > .fs-label,
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-themerow > .fs-label,
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-logout > .fs-label,
+		:root[data-sb][data-rail] .fs-wordmark,
+		:root[data-sb][data-rail] .fs-navlabel,
+		:root[data-sb][data-rail] .fs-modemenu,
+		:root[data-sb][data-rail] .fs-sidebar ul.nav > li > a > .fs-label,
+		:root[data-sb][data-rail] .fs-themerow > .fs-label,
+		:root[data-sb][data-rail] .fs-logout > .fs-label,
 		/* a rail item has no accordion — its children fly out sideways — so the chevron says
 		 * nothing and crowds the icon. Selector kept this long because the vertical override
 		 * turns the chevron back on at (0,6,3), so a plainer form here would only be (0,6,0). */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > a .fs-chevron { display: none; }
+		:root[data-sb][data-rail] .fs-sidebar ul.nav > li > a .fs-chevron { display: none; }
 
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > a,
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-themerow,
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-logout {
+		:root[data-sb][data-rail] .fs-sidebar ul.nav > li > a,
+		:root[data-sb][data-rail] .fs-themerow,
+		:root[data-sb][data-rail] .fs-logout {
 			justify-content: center; gap: 0; padding: var(--fs-space-2-5) 0;
 		}
 
 		/* leaf sections have no flyout — show their name as a tooltip bubble */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a::after {
+		:root[data-sb][data-rail] .fs-sidebar ul.nav > li:not(.has-sub) > a::after {
 			content: attr(data-label);
 			position: absolute; inset-inline-start: 100%; top: 50%; transform: translateY(-50%);
 			margin-inline-start: var(--fs-space-2-5); z-index: var(--fs-z-flyout);
@@ -369,12 +366,12 @@
 			color: var(--fs-text); font-size: var(--fs-type); font-weight: var(--fs-weight); white-space: nowrap;
 			opacity: 0; pointer-events: none; transition: opacity var(--fs-dur);
 		}
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a:hover::after { opacity: 1; }
+		:root[data-sb][data-rail] .fs-sidebar ul.nav > li:not(.has-sub) > a:hover::after { opacity: 1; }
 
 		/* the flyout: opened by hover on a mouse, or by .open which the menu JS toggles on tap
 		 * (exclusively — fs-chrome.js flyoutMode). Hover gated on a real pointer: mobile
 		 * browsers leave :hover stuck on the tapped element, which would block tap-to-close. */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub > ul {
+		:root[data-sb][data-rail] .fs-sidebar ul.nav > li.has-sub > ul {
 			display: none;
 			position: absolute; inset-inline-start: 100%; top: -8px; margin-block: 0; margin-inline: var(--fs-space-2-5) 0;
 			min-width: 196px; padding: var(--fs-space-2); z-index: var(--fs-z-flyout);
@@ -382,13 +379,13 @@
 			box-shadow: var(--fs-shadow-pop);
 			animation: fs-fade var(--fs-dur);
 		}
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
+		:root[data-sb][data-rail] .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
 		@media (hover: hover) {
-			:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
+			:root[data-sb][data-rail] .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
 		}
 		/* The flyout's heading reuses the bar's hover-bridge pseudo-element (issue #22) —
 		 * chrome.md, "A flyout's heading reuses the bar's hover-bridge pseudo-element". */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > ul[data-title]::before {
+		:root[data-sb][data-rail] .fs-sidebar ul.nav > li > ul[data-title]::before {
 			content: attr(data-title);
 			position: static; inset: auto; height: auto;
 			padding: var(--fs-space-1) var(--fs-space-3) var(--fs-space-2);
@@ -396,7 +393,7 @@
 			letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase;
 		}
 		/* bridge the 10px gap so the pointer can travel icon -> flyout without a hover drop */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub::after {
+		:root[data-sb][data-rail] .fs-sidebar ul.nav > li.has-sub::after {
 			content: ""; position: absolute; inset-inline-start: 100%; top: 0;
 			width: 12px; height: 100%;
 		}
@@ -405,10 +402,9 @@
 		 * alone: data-rail stamps pre-paint, data-narrow lands later from an async module, so a
 		 * narrow phone would paint a bare glyph in the phone bar until the modules land.
 		 * --fs-ctl-h-sm follows the Density axis, one step under the bar's pill. */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"] {
-			font-size: 0; width: var(--fs-ctl-h-sm); height: var(--fs-ctl-h-sm); padding: 0;
-			border: 0; box-shadow: none; background: var(--fs-good);
-			-webkit-mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
+		:root[data-sb][data-rail] .fs-sidebar #indicators [data-indicator="poll-status"] {
+			font-size: 0; width: var(--fs-ctl-h-sm); height: var(--fs-ctl-h-sm); min-height: 0; padding: 0;
+			border: 0; background: var(--fs-good);
 			mask: var(--fs-icon-refresh) center / var(--fs-icon-refresh-sz) no-repeat;
 			/* Static, deliberately: this is a poll running quietly forever, not something being
 			 * waited on, and a permanently spinning glyph also broke the click that pauses it. */
@@ -416,23 +412,22 @@
 
 		/* paused: the same glyph gone quiet — without it the rail kept saying GREEN while the
 		 * poll was stopped, the one thing the indicator exists to report. */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"]:not([data-style="active"]) {
+		:root[data-sb][data-rail] .fs-sidebar #indicators [data-indicator="poll-status"]:not([data-style="active"]) {
 			background: var(--fs-dim);
 		}
 
 		/* Badges its count instead of wrapping its prose (issue #14) — chrome.md, "A
 		 * collapsed-rail indicator badges its count". `.fs-sidebar` is deliberately absent:
 		 * #indicators is an id. */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] #indicators [data-indicator]:not([data-indicator="poll-status"]) {
+		:root[data-sb][data-rail] #indicators [data-indicator]:not([data-indicator="poll-status"]) {
 			/* min-width, not width: the count is unbounded (a big config can queue three digits)
 			 * and a fixed box would clip it. */
-			font-size: 0; min-width: var(--fs-ctl-h-sm); max-width: 100%; height: var(--fs-ctl-h-sm);
+			font-size: 0; min-width: var(--fs-ctl-h-sm); max-width: 100%; height: var(--fs-ctl-h-sm); min-height: 0;
 			padding: 0 var(--fs-space-1); overflow: hidden;
-			display: inline-flex; align-items: center; justify-content: center;
 		}
 		/* .fs-ind-compact above paints the same badge but cannot SHARE this
 		 * rule: it applies at every width, this one must stay inside the 521px floor. */
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] #indicators [data-indicator]:not([data-indicator="poll-status"])::after {
+		:root[data-sb][data-rail] #indicators [data-indicator]:not([data-indicator="poll-status"])::after {
 			content: attr(data-fs-badge);
 			font-size: var(--fs-type-xs); font-weight: var(--fs-weight-bold); font-variant-numeric: tabular-nums;
 		}
@@ -494,7 +489,7 @@
 		text-align: center;
 		/* target-size floor for the two links this sentence carries (WCAG 2.2 SC 2.5.8) —
 		 * chrome.md, "A footer link pair needs 26px". */
-		line-height: max(26px, calc(var(--fs-type) * 2));
+		line-height: max(1.625rem, calc(var(--fs-type) * 2));
 	}
 	footer a { color: var(--fs-dim); }
 	footer a:hover { color: var(--fs-accent); }

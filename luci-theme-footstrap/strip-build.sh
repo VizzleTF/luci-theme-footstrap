@@ -104,8 +104,9 @@ strip() {
 						}
 						incomment = 1; next
 					}
-					# an inline comment (code before it) is left alone and counted
-					if (line ~ /\/\*/) LEFT++
+					# an inline comment (code before it) is left alone and counted; a bare `/*` with no closer
+					# on its line is a glob or a regex in a string (the i18n path in head.ut), not a comment
+					if (line ~ /\/\*.*\*\//) LEFT++
 					print line; next
 				}
 				# inside a block comment: it may only end a line, or we would drop live code
@@ -120,7 +121,7 @@ strip() {
 		' "$1" > "$CUR"
 		cat "$CUR" > "$1"
 		# Indentation and blank lines, -1,627 B of the 21,631 the comment passes leave: ucode eats the
-		# newline after a `%}`, so the line below one keeps its indentation; anywhere else every
+		# newline after a `%}`, so the line below one keeps one char of its indentation; anywhere else every
 		# whitespace run keeps its newline, which HTML, ucode code and inline JS/CSS read the same.
 		# Line 1 stays whole.
 		# Refused: an odd backtick count (a template literal spanning lines), a trailing backslash (a
@@ -181,6 +182,9 @@ strip() {
 				if (NR > 1) {
 					if (!blk) { sub(/^[ \t]+/, "", line); keep = (line != "") }
 					else if (line ~ /^[ \t]+$/) line = ""
+					# lstrip_blocks drops it before a `{%` anyway; anywhere else one char still separates
+					else if (line ~ /^[ \t]+[{]%/) sub(/^[ \t]+/, "", line)
+					else sub(/^[ \t][ \t]+/, "\t", line)
 				}
 				blk = ($0 ~ /%[}][ \t\r]*$/)
 				if (keep) print line

@@ -15,7 +15,6 @@ luci-theme-footstrap/
     00-header.css      banner + the single @layer declaration
     02-tokens.css      @layer tokens   private --fs-* tier + the --*-color-* export tier
     03-palettes.css    @layer tokens   palettes (tokens only)
-    04-nocolormix.css  @layer tokens   static twins for the color-mix() tokens
     base/              @layer base     widget defaults the views count on
       10-reset  20-typography  30-forms  40-tables  50-chrome
       60-modal  70-buttons  90-widgets  95-luci
@@ -78,11 +77,13 @@ forced-colors focus outline there is flagged for the same reason: themed rules s
 
 ## The browser floor
 
-Chrome 108, Firefox 101, Safari 15.4. Below that the page is broken, not plainer.
+Chrome 120, Firefox 121, Safari 17.2. Below that the page is broken, not plainer.
 
-`@layer`, `:is()`/`:where()`, `:focus-visible`, `svh`/`dvh`, `accent-color` and the logical
-properties set the floor. None of them gets a fallback: a theme whose layers are ignored is not a
-theme.
+Relaxed CSS nesting sets the floor: `tools/nest-css.mjs` folds rules that share a selector prefix
+into nested rules, 11.3 KB of the shipped sheet (measured 2026-10-31). The same step made
+unprefixed masking and `:has()` floor features. `color-mix()` (111 / 113 / 16.2), `@layer`,
+`:is()`/`:where()`, `:focus-visible`, `svh`/`dvh`, `accent-color`, `@container`, `overflow: clip`
+and the logical properties sit at or under it. None of them gets a fallback: a theme whose layers are ignored is not a theme.
 
 Write an asymmetric inline offset as `*-block` plus `*-inline` (`margin-block: 0;
 margin-inline: var(--x) 0`), never as a physical shorthand followed by one `*-inline-start`
@@ -93,26 +94,9 @@ plainer:
 
 | Feature | Chrome / Firefox / Safari | What is lost below it |
 |---|---|---|
-| `:has()` | 105 / 121 / 15.4 | refinements: port tiles, password control-group, stacked-table footers |
-| `color-mix()` | 111 / 113 / 16.2 | the mixed tokens fall back to `styles/04-nocolormix.css` |
-| `@container` | 105 / 110 / 16.0 | width adaptations inside `fs-view` / `fs-content` |
 | relative `oklch(from …)` | 122 / 128 / 18 | the tint and the accent/status hue axes. The rules sit under an `@supports` probe of the exact syntax. The ink on a hex accent does not depend on it: `inkFor()` in `fs-axes.js` and the `head.ut` pre-paint compute it in JS |
+| unprefixed `backdrop-filter` | 76 / 103 / 18 | the glass blur: cards and the bar stay translucent, the wallpaper shows through unblurred |
 | `text-wrap: pretty`, `scrollbar-width` | n/a | typographic polish |
-| `overflow: clip` | 90 / 94 / 16.0 | `.fs-main` and `.fs-staging` fall back to the browser's cross-axis correction: a sideways scrollbar or page-wide horizontal scroll, as stock LuCI renders. `.fs-staging` stays `visibility: hidden`, so nothing staged is exposed |
-
-Two rules follow.
-
-A `:has()` part never shares a selector list with a part that has none. A selector list is not
-forgiving: one unsupported compound drops the whole rule. `.table.fs-stacked .tr,
-.table.fs-stacked tfoot:not(:has(> .tr))` as one rule would cost Firefox 115 ESR `display: flex`
-on every stacked card. Split the rule, or wrap the list in `:is()`, which is forgiving and drops
-only the compound it cannot parse.
-
-A token built with `color-mix()` gets a static twin in `04-nocolormix.css`. Without
-`color-mix()`, `background: var(--fs-good-soft)` is invalid at computed-value time and computes to
-`unset`; the usual two-declaration fallback does nothing for a token. Tints degrade to
-`transparent`, hairlines to the solid colour they are a fraction of, and the focus ring to
-`--fs-focus-ring-solo`.
 
 A CSS feature the sheet has not used before goes on one side of this line: it moves the floor, or
 it joins the table. Check values too, not only properties: `overflow` is ancient, `overflow: clip`
@@ -122,15 +106,20 @@ and `requestIdleCallback` is the only feature-detected API.
 ### Vendor prefixes still in the sheet
 
 A prefix stays only while the unprefixed form is missing at the floor in some engine. Check MDN's
-browser-compat-data before adding or removing one. `-webkit-mask*` looks safe to cut and is not:
-unprefixed masking ships from Chrome 120.
+browser-compat-data before adding or removing one. `-webkit-mask*` went with the Chrome 120 floor,
+which masks unprefixed. `-webkit-backdrop-filter` was cut on purpose: Safari
+17.2–17.x is about 2% of iOS in 2026, so its glass goes without blur (the table above) rather than
+cost every page load the prefix. lightningcss runs with `VendorPrefixes` excluded, so the source
+alone decides which prefixes ship.
 
 ## The build
 
 `build-css.sh` concatenates the directories. Without `--dev`, one awk pass then strips comments
 and whitespace: uhttpd serves `/www/luci-static/*.css` with no gzip, so every byte travels. The
-package build also shortens the private token names and joins the rules onto one line; see
-[package.md](package.md).
+package build (`tools/stage.sh`) then runs lightningcss over the squeezed sheet
+(`tools/minify-css.mjs`, targets = the browser floor) and shortens the private token names; see
+[package.md](package.md). lightningcss refuses the build on any rule it cannot read, rather than
+ship its rewrite without that rule.
 
 Each file opens with the `@layer` wrapper its directory means. The build strips that wrapper (the
 first line to the `}` where brace depth returns to 0) and emits one wrapper per directory. The depth
@@ -157,7 +146,7 @@ The whitespace pass never touches:
   loses the canvas colour;
 - anything inside a string. Every data URI here is quoted.
 
-Five rewrites spell the same selector or declaration shorter, never inside a string or a comment:
+Six rewrites spell the same selector or declaration shorter, never inside a string or a comment:
 
 - `[attr="ident"]` → `[attr=ident]`. The value must be a whole ident on one line
   (`-?[A-Za-z_][-A-Za-z0-9_]*`) with no `\` and no `--`: `mangle-tokens.sh` reads an unquoted
@@ -173,6 +162,9 @@ Five rewrites spell the same selector or declaration shorter, never inside a str
 - A `flex` triple with a keyword form: `0 0 auto` → `none`, `1 1 auto` → `auto`, `0 1 auto` →
   `0 auto`, `1 1 <length or %>` → `<length or %>`. A bare `0`, a `var()` or `calc()` basis, and a
   custom property named `--flex` are left alone.
+- `transparent` → `#0000`, the same computed `rgba(0, 0, 0, 0)` (4-digit hex: Chrome 62, Safari
+  10). A whole word in a declaration only: an ident that contains it and an `@supports` condition
+  keep the keyword. A custom property then holds `#0000` as its text, which no script reads.
 
 The first three rewrites cannot tell a selector from a declaration. Do not put `[x="y"]` or ` !`
 inside a custom-property value: script reading it back with `getPropertyValue` would get the
@@ -212,7 +204,7 @@ list it here. Edit both copies together. Each copy's comment names the other.
 |---|---|
 | `theme/30-tables.css`: `.table.fs-stacked .td[data-title]::before`, `.td.cbi-section-actions`, its `> :not(.cbi-dropdown)` and `> .cbi-dropdown` | `theme/65-dropdown.css`, inside `@container fs-content`: the same four under `.table.cbi-section-table` |
 | `theme/30-tables.css`: `.table.fs-stacked .tr` | same file: `.table.fs-stacked tfoot:not(:has(> .tr))` |
-| `theme/20-shell.css`: `.fs-sidebar.fs-ind-compact #indicators` poll glyph and badge | same file: the `[data-rail="true"]` poll glyph and badge |
+| `theme/20-shell.css`: `.fs-sidebar.fs-ind-compact #indicators` poll glyph and badge | same file: the `[data-rail]` poll glyph and badge |
 | `theme/25-progressbar.css`: `.cbi-value-field > .cbi-progressbar::after` | same file: `.cbi-section .table:has(.tr.table-titles) .td .cbi-progressbar::after` |
 | `theme/60-inputs.css`: `.cbi-value-field select option:checked` | `theme/65-dropdown.css`: `.cbi-dropdown[open] > ul.dropdown > li[selected]` |
 | `theme/70-modal.css`: `#modal_overlay .modal label.btn` | `theme/90-responsive.css`: the `@container fs-view (max-width: 360px)` button rule |
@@ -315,7 +307,7 @@ radios stay in the box, so the arrow keys still move the choice.
   wallpaper, and Material (`.fs-ap-material`) while both opacities are at 100%.
 
 The colour-contrast readout (`.fs-color-contrast` and its three grade colours) shows the live ratio
-against the surface the colour is read on (`contrastRatio` in `fs-appearance.js`). It appears only
+against the surface the colour is read on (`contrastRatio` in `view/footstrap/appearance.js`). It appears only
 below AA: a passing colour needs no line under it. It is a readout, not a validation: the theme
 never corrects a colour the admin asked for.
 
@@ -357,9 +349,11 @@ Meter rows (a key/value-shaped `.table` row carrying a `.cbi-progressbar`: Memor
 load, connections) match
 `:not(:has(.th)):not(:has(.td:nth-child(3))):has(.cbi-progressbar)`, not a named section. Any
 key/value include on this page gets the layout: label and value on one line, the bar below. Off
-this page the same shape gets only the base `.cbi-progressbar` default. Below 560px the value's
-reserve (`padding-inline-end: min(230px, 50%)`) no longer fits, so the label takes the whole line
-and the bar drops below it.
+this page the same shape gets only the base `.cbi-progressbar` default. The label reserves the
+widest value's width (`padding-inline-end`: 32 glyphs of .6em mono at `--fs-type`, plus a gap,
+258px at the default size) and breaks a long mount path anywhere. The old `min(230px, 50%)` let a
+30-glyph value (235px) run under the label in a two-column layout. Below 35rem (560px) the reserve
+no longer fits, so the label takes the whole line and the bar drops below it.
 
 Row dividers and the key/value weight drop only where the table's shape is a real key/value pair.
 See "Tables: the key/value discriminator is the table's shape, not a class" below.
@@ -435,7 +429,7 @@ sets an input's size, so the theme's generic field box outranks nothing it shoul
 
 ### Forms: the label column's `min-width: 0` survives the responsive layer
 
-`.cbi-value-title` is a flex item at `flex: 0 0 180px`. `theme/90-responsive.css` sets
+`.cbi-value-title` is a flex item at `flex: 0 0 11.25rem` (180px at the default font size). `theme/90-responsive.css` sets
 `flex: 1 1 100%` under 767px and leaves `min-width` alone, so the `min-width: 0` set here survives
 into the phone layout. Without it a label with few break points (often a translated one) renders at
 its min-content and clips the section.
@@ -581,7 +575,7 @@ on the label nothing would be visible; on the input, the app hides an empty plac
 package-manager.js and banip) makes the input a shrinkable flex item, and a shrunk pill lets the
 knob overhang.
 
-The knob's travel is a `translateX`, which is physical, so `[dir="rtl"]` negates `--sw-travel`.
+The knob's travel is a `translateX`, which is physical, so `[dir="rtl"]` negates `--fs-sw-travel`.
 
 ### Inputs: `.hidden.hidden`, and the Tailwind/UnoCSS exception
 

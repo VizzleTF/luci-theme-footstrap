@@ -99,7 +99,7 @@ without `depends.acl` are skipped, as in the dispatcher.
 
 `pushState` stores the real dispatcher URL, so F5 and deep links work server-side unchanged.
 `body[data-page]` holds the resolved leaf path (`rsegs.join('-')`), as the server stamps it on a
-full load. fs-chrome, fs-fit, fs-overview and menu-footstrap-common read it as the route's identity,
+full load. fs-chrome, fs-fit, fs-overview and menu-footstrap read it as the route's identity,
 never as a CSS scope.
 
 ## Re-instantiating a view — the main subtlety
@@ -244,7 +244,7 @@ never calls `require`, which would run `__init__`. `moduleUrl()` must build the 
 no dot.
 
 A click waits for an unfinished prefetch of its class (`warmedThen()`, capped by `WARM_WAIT_MS`),
-because two requests for one URL are not coalesced. `warmRecent()` in `menu-footstrap-common.js`
+because two requests for one URL are not coalesced. `warmRecent()` in `menu-footstrap.js`
 warms up to 5 recent pages, unless `navigator.connection.saveData` is set.
 
 ## Background polling pause
@@ -307,7 +307,7 @@ caller's request. A `session.access` answering `access: true` clears the flag.
 - Third-party apps that register `view` nodes speed up automatically.
 - Status→Overview (`template` node `admin_status/index`) is the SPA exception. Its template only
   defines three global helpers and calls `ui.instantiateView('status/index')`.
-  `menu-footstrap-common.js` defines the helpers at module eval (`ensureOverviewHelpers()`), and
+  `menu-footstrap.js` defines the helpers at module eval (`ensureOverviewHelpers()`), and
   the router instantiates `view.status.index`. Other `template` nodes take a full navigation.
 - Any require or instanceof error goes to `console.error(...)`, then `window.location = pathname`.
 

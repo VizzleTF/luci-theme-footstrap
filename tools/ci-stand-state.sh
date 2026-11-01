@@ -4,7 +4,7 @@
 #
 #   sh tools/ci-stand-state.sh <router> <file>
 #
-# The one stand death on record (run 40168981468) left nothing to name its cause by. Best effort:
+# The one stand death on record left nothing to name its cause by. Best effort:
 # it decides nothing, and a dead container must not turn the step red. Every docker call has a
 # clock, because it also runs between a check and its retry on a fresh router.
 r="${1:?usage: ci-stand-state.sh <router> <file>}"

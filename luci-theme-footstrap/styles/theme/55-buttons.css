@@ -203,18 +203,14 @@
 		background: var(--fs-accent);
 		border: 1px solid transparent;
 		color: var(--fs-on-accent);
-		text-shadow: none;
 	}
 	/* a TINT at rest, not a bare outline, or Save reads disabled beside the solid Save & Apply;
 	 * -soft/-fill off the role ladder. Label --fs-text, not --fs-accent: accent on accent-soft
 	 * measures 4.25:1, an AA failure (docs/design-system.md). */
-	.cbi-page-actions .cbi-button-save,
-	.cbi-page-actions .cbi-button-apply + .cbi-button-save,
-	.cbi-page-actions .cbi-button-negative + .cbi-button-save {
+	.cbi-page-actions .cbi-button-save {
 		background: var(--fs-accent-soft);
 		border: 1px solid var(--fs-accent-line);
 		color: var(--fs-text);
-		text-shadow: none;
 	}
 	.cbi-page-actions .cbi-button-save:hover {
 		background: var(--fs-accent-fill);
@@ -236,7 +232,7 @@
 	.control-group:has(> .cbi-input-password) > button.cbi-button-neutral {
 		border: 0; border-radius: 0; margin: 0;
 		background: transparent; color: var(--fs-dim);
-		padding: 0 var(--fs-space-3); min-height: var(--fs-ctl-h);
+		padding: 0 var(--fs-space-3);
 		border-inline-start: var(--fs-hairline);
 	}
 	.control-group:has(> .cbi-input-password) > button.cbi-button-neutral:hover { color: var(--fs-accent); }

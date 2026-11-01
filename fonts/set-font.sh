@@ -137,7 +137,7 @@ command -v uci >/dev/null 2>&1 || die "No uci — this is not an OpenWrt router.
 	info "luci-theme-footstrap does not look installed here; writing the settings anyway."
 
 # uci refuses to CREATE a config file, only a section within one, and a router that installed a
-# footstrap predating the Appearance defaults has no such file. Same two lines as uci-defaults.
+# footstrap predating the Appearance defaults has no such file (the package ships it now).
 [ -f /etc/config/footstrap ] || : > /etc/config/footstrap
 uci -q get footstrap.settings >/dev/null 2>&1 || uci set footstrap.settings=footstrap
 
@@ -155,11 +155,14 @@ fi
 
 # --- get the bytes --------------------------------------------------------
 # Certificates are always verified. This runs as root and a failed verification is the MITM case,
-# not a reason to retry insecurely — so there is no -k anywhere, and no fallback to one.
+# not a reason to retry insecurely — so there is no -k anywhere, and no fallback to one. Every
+# downloader is tried until one SUCCEEDS, as in install.sh: a router can have uclient-fetch without
+# libustream, so the first one that exists may not speak TLS. Each next tool verifies too.
 fetch() {	# <url> <outfile>
-	if command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -T 30 -qO "$2" "$1"
-	elif command -v curl >/dev/null 2>&1; then curl -fsSL --proto '=https' --max-time 30 -o "$2" "$1"
-	else wget -q -T 30 -O "$2" "$1"; fi
+	command -v uclient-fetch >/dev/null 2>&1 && uclient-fetch -T 30 -qO "$2" "$1" && return 0
+	command -v wget >/dev/null 2>&1 && wget -q -T 30 -O "$2" "$1" && return 0
+	command -v curl >/dev/null 2>&1 && curl -fsSL --proto '=https' --max-time 30 -o "$2" "$1" && return 0
+	return 1
 }
 
 TMPD="/tmp/fs-font.$$"
@@ -311,8 +314,8 @@ uci commit footstrap
 # same way — `ln` exits 0 and the link lands at .../fonts/fonts, one level too deep: an existing
 # symlink to a directory is followed (-n prevents that), and a REAL directory is entered (-n does
 # not). Every footstrap before 0.12.1 shipped such a directory here, so this is the ordinary case on
-# an upgraded router. uci-defaults does the same two steps on every install; repeated here for a
-# router whose installed theme predates them.
+# an upgraded router. uci-defaults only links (ln -sfn) and never clears a real directory, so the
+# clearing lives here.
 if [ -d /www/luci-static/footstrap ]; then
 	if [ -e "$FONT_SERVE" ] && [ ! -L "$FONT_SERVE" ]; then
 		info "Clearing the old $FONT_SERVE directory (webfonts a footstrap before 0.12.1 shipped)."

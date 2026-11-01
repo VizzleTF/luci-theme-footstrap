@@ -1,7 +1,7 @@
 @layer theme {
 	/* phone overflow safety net (<=767px): .fs-main is overflow-x: clip, cutting anything wider silently; tablets were clean */
 	/* split-button labels wrap under 360px — docs/css.md "Responsive: a split button's label must wrap under 360px" */
-	@container fs-view (max-width: 360px) {
+	@container fs-view (max-width: 22.5rem) {
 		#view .cbi-button, #view .btn,
 		#view input[type="button"], #view input[type="submit"], #view input[type="reset"] {
 			white-space: normal;
@@ -17,7 +17,7 @@
 		.cbi-dropdown { min-width: 0; max-width: 100%; }
 		/* form dropdowns: 65-dropdown.css's (0,3,0) 210px/400px floor outranks the rule above, a @media adds no
 		 * specificity; the doubled class lifts this one to (0,4,0), min() so a 320px modal field is not overflowed */
-		.cbi-dropdown.cbi-dropdown:not(.btn):not(.cbi-button) { min-width: min(210px, 100%); max-width: 100%; }
+		.cbi-dropdown.cbi-dropdown:not(.btn):not(.cbi-button) { min-width: min(13.125rem, 100%); max-width: 100%; }
 		/* phone tier over 65-dropdown.css's `width: max-content` (0,3,1): the doubled class makes this (0,4,1); trigger already capped to field width, `auto` keeps the popup on-screen */
 		.cbi-dropdown[open] > ul.dropdown.dropdown { width: auto; }
 
@@ -43,8 +43,8 @@
 		:where(#view)[data-page="admin-system-package-manager"] .controls > div > div:has(> label > input[type="radio"]) {
 			display: flex; flex-wrap: wrap; align-items: center; gap: var(--fs-space-1) var(--fs-space-5);
 		}
-		:where(#view)[data-page="admin-system-package-manager"] .controls .control-group { display: flex; flex-wrap: wrap; min-width: 0; gap: var(--fs-space-2); }
-		:where(#view)[data-page="admin-system-package-manager"] .controls .control-group input { flex: 1 1 140px; min-width: 0; max-width: 100%; }
+		:where(#view)[data-page="admin-system-package-manager"] .controls .control-group { display: flex; flex-wrap: wrap; gap: var(--fs-space-2); }
+		:where(#view)[data-page="admin-system-package-manager"] .controls .control-group input { flex: 1 1 8.75rem; min-width: 0; max-width: 100%; }
 
 		/* Diagnostics stack not here: fs-select.js writes .fs-rowstack at any width, theme/30-tables.css carries it */
 
@@ -56,7 +56,6 @@
 		.cbi-value-field select,
 		.cbi-value-field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 		.cbi-value-field .cbi-dropdown:not(.btn):not(.cbi-button),
-		.cbi-value-field .cbi-dynlist,
 		.cbi-value-field .cbi-select { width: 100%; }
 		/* min-width: 0 only, base/40-tables.css already breaks a long value */
 		#view .fs-ovl .table .td, #view .fs-ovl .table .th { min-width: 0; }

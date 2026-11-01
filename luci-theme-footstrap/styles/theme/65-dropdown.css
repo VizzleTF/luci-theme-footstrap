@@ -18,7 +18,6 @@
 		border: 0;
 		color: var(--fs-on-accent);
 	}
-	.cbi-page-actions .cbi-dropdown.cbi-button-apply:hover,
 	.cbi-page-actions .cbi-dropdown > .cbi-button:hover { filter: var(--fs-hover-lift); }
 
 	/* ---- cbi-dropdown widget: the JS select used across all forms ---- */
@@ -28,7 +27,6 @@
 	.cbi-dropdown {
 		display: inline-flex;
 		cursor: pointer;
-		height: auto;
 		position: relative;
 		padding: 0;
 	}
@@ -41,8 +39,7 @@
 		margin: 0;
 		padding: 0;
 		list-style: none;
-		overflow-x: hidden;
-		overflow-y: hidden;
+		overflow: hidden;
 		display: flex;
 		width: 100%;
 	}
@@ -125,7 +122,6 @@
 	.cbi-dropdown[open] > ul.preview,
 	.cbi-dropdown[open] > ul.dropdown > li,
 	.cbi-dropdown[multiple] > ul > li > label,
-	.cbi-dropdown[multiple][open] > ul.dropdown > li,
 	.cbi-dropdown[multiple][more] > .more,
 	.cbi-dropdown[multiple][empty] > .more,
 	.cbi-dropdown:not([open]):not(.btn):not(.cbi-button) > ul > li[placeholder][display] {
@@ -162,8 +158,8 @@
 		font-size: var(--fs-type);
 		transition: var(--fs-field-transition);
 		/* absorbed from base/30-forms.css; NOT the dynlist's numbers (240/440) — one value vs a column of them */
-		min-width: 210px;
-		max-width: 400px;
+		min-width: 13.125rem;
+		max-width: 25rem;
 		width: auto;
 	}
 	.cbi-dropdown.btn, .cbi-dropdown.cbi-button { padding: 0; }
@@ -236,12 +232,11 @@
 		padding: var(--fs-space-1-5);
 		margin-top: var(--fs-space-1-5);
 		/* anchored to its widget: ui.js's touch branch assumes the viewport as containing block; !important beats the inline style */
-		inset-inline-start: 0 !important;
-		inset-inline-end: auto !important;
+		inset-inline: 0 auto !important;
 		min-width: 100%;
 		/* desktop only: min(92vw,420px) ignores trigger's left offset, grew past viewport under 767px (113 findings) */
 		width: max-content;
-		max-width: min(92vw, 420px);
+		max-width: min(92vw, 26.25rem);
 	}
 	.cbi-dropdown[open] > ul.dropdown > li {
 		border-radius: var(--fs-radius-sm);
@@ -288,7 +283,6 @@
 	}
 
 	.cbi-dropdown[open] > ul.dropdown > li.create-item { border-top: var(--fs-hairline); margin-top: var(--fs-space-1); }
-	.cbi-dropdown .create-item-input { background: var(--fs-panel2); border: var(--fs-hairline); border-radius: var(--fs-radius); color: var(--fs-text); }
 	/* dropdown add-item (e.g. Community Lists) — the .cbi-dropdown styles itself, wrapper stays transparent: no double frame */
 	.cbi-dynlist > .add-item:has(> .cbi-dropdown) {
 		background: none; border: 0; overflow: visible; box-shadow: none;
@@ -307,7 +301,7 @@
 	 * data-table stack (theme/30-tables.css); a @container, not the tables' own measurement, since
 	 * un-collapsing a row to measure it CHANGES what its widgets read. 992, not 960 — docs/css.md
 	 * "Dropdown: 992px, not 960" has the padding subtraction and the regression it fixed. */
-	@container fs-content (max-width: 992px) {
+	@container fs-content (max-width: 62rem) {
 		.table.cbi-section-table,
 		.table.cbi-section-table .thead,
 		.table.cbi-section-table .tbody,
@@ -327,7 +321,6 @@
 			padding: var(--fs-space-2) var(--fs-space-3-5) var(--fs-space-3);
 			margin-bottom: var(--fs-space-3);
 		}
-		.table.cbi-section-table .tr:hover { background: var(--fs-panel2); }
 		/* margin: 0 load-bearing: the Lua CBI gives a table CELL the .cbi-value-field class a form
 		 * field carries, base indents it 20px — without the reset two cells no longer fit a line */
 		.table.cbi-section-table .td {

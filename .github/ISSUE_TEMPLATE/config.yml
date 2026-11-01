@@ -2,7 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: 📖 Документация и установка / Docs & installation
     url: https://github.com/VizzleTF/luci-theme-footstrap#readme
-    about: Как установить, выбрать раскладку и палитру. / How to install, pick a layout and a palette.
+    about: Как установить и обновить тему. / How to install and update the theme.
   - name: 💬 Вопрос, а не баг — чат в Telegram / Question, not a bug — Telegram chat
     url: https://t.me/onlyyaml/92257
     about: Вопросы по использованию и обсуждения — сюда. / Usage questions and general discussion go here.

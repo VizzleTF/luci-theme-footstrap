@@ -1,17 +1,17 @@
 msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8"
 
-#: htdocs/luci-static/resources/fs-appearance.js:304
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:329
 msgctxt "footstrap"
 msgid "Accent"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:455
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:483
 msgctxt "footstrap"
 msgid "Acrylic"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:370
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:400
 msgctxt "footstrap"
 msgid "As in file"
 msgstr ""
@@ -20,32 +20,32 @@ msgstr ""
 msgid "Authorization Required"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:287
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:312
 msgctxt "footstrap"
 msgid "Auto"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:320
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:345
 msgctxt "footstrap"
 msgid "Auto-collapse"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:461
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:489
 msgctxt "footstrap"
 msgid "Background"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:120
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:123
 msgctxt "footstrap"
 msgid "Barely visible %s"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:457
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:485
 msgctxt "footstrap"
 msgid "Blur"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:501
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:529
 msgctxt "footstrap"
 msgid "Borders"
 msgstr ""
@@ -58,22 +58,22 @@ msgstr ""
 msgid "Cached"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:445
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:474
 msgctxt "footstrap"
 msgid "Card opacity"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:498
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:526
 msgctxt "footstrap"
 msgid "Cards"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:356
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:386
 msgctxt "footstrap"
 msgid "Choose SVG"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:349
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:379
 msgctxt "footstrap"
 msgid "Choose image"
 msgstr ""
@@ -85,53 +85,48 @@ msgid ""
 "reference(s)."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:119
-msgctxt "footstrap"
-msgid "Clearly visible %s"
-msgstr ""
-
-#: htdocs/luci-static/resources/fs-chrome.js:516
+#: htdocs/luci-static/resources/fs-chrome.js:546
 #: ucode/template/themes/footstrap/header.ut:117
 msgid "Collapse menu"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:285
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:310
 msgctxt "footstrap"
 msgid "Colour scheme"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:368
-#: htdocs/luci-static/resources/fs-appearance.js:622
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:398
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:650
 msgctxt "footstrap"
 msgid "Colours"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:465
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:493
 msgctxt "footstrap"
 msgid "Colours the page so you can tell routers apart."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:324
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:349
 msgctxt "footstrap"
 msgid "Compact"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:573
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:601
 msgctxt "footstrap"
 msgid "Confirm reset"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:332
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:362
 msgctxt "footstrap"
 msgid "Content width"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:130
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:129
 msgctxt "footstrap"
 msgid "Contrast %s:1 (WCAG AA wants %s:1 here)"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:499
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:527
 msgctxt "footstrap"
 msgid "Controls"
 msgstr ""
@@ -141,47 +136,42 @@ msgctxt "footstrap"
 msgid "Could not process the image."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:547
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:575
 msgctxt "footstrap"
 msgid "Could not save to the router. Reload the page and try again."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:493
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:521
 msgctxt "footstrap"
 msgid "Danger"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:289
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:314
 msgctxt "footstrap"
 msgid "Dark"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:323
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:348
 msgctxt "footstrap"
 msgid "Density"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:378
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:408
 msgctxt "footstrap"
 msgid "Dim"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:122
-msgctxt "footstrap"
-msgid "Easy to read %s"
-msgstr ""
-
-#: htdocs/luci-static/resources/fs-chrome.js:516
+#: htdocs/luci-static/resources/fs-chrome.js:546
 msgid "Expand menu"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:375
-#: htdocs/luci-static/resources/fs-appearance.js:478
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:405
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:506
 msgctxt "footstrap"
 msgid "File"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:453
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:481
 msgctxt "footstrap"
 msgid "Flat"
 msgstr ""
@@ -190,12 +180,12 @@ msgstr ""
 msgid "Footstrap"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:187
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:186
 msgctxt "footstrap"
 msgid "Footstrap needs OpenWrt 24.10.3 or newer."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:601
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:629
 msgctxt "footstrap"
 msgid ""
 "Footstrap theme settings apply at once and are stored permanently in this "
@@ -208,7 +198,7 @@ msgid ""
 "pattern uploads, and the Footstrap settings page"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:454
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:482
 msgctxt "footstrap"
 msgid "Frosted"
 msgstr ""
@@ -221,17 +211,17 @@ msgstr ""
 msgid "Go to password configuration..."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:491
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:519
 msgctxt "footstrap"
 msgid "Good"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:124
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:125
 msgctxt "footstrap"
 msgid "Hard to read %s — large text only"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:309
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:334
 msgctxt "footstrap"
 msgid "Interface"
 msgstr ""
@@ -244,23 +234,23 @@ msgstr ""
 msgid "JavaScript required!"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:319
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:344
 msgctxt "footstrap"
 msgid "Keep open"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:326
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:351
 msgctxt "footstrap"
 msgid "Large"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:310
-#: htdocs/luci-static/resources/fs-appearance.js:594
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:335
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:622
 msgctxt "footstrap"
 msgid "Layout"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:288
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:313
 msgctxt "footstrap"
 msgid "Light"
 msgstr ""
@@ -278,7 +268,7 @@ msgstr ""
 msgid "Lua compatibility mode active"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:452
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:480
 msgctxt "footstrap"
 msgid "Material"
 msgstr ""
@@ -292,12 +282,12 @@ msgstr ""
 msgid "Menu"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:450
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:478
 msgctxt "footstrap"
 msgid "Menu opacity"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:286
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:311
 msgctxt "footstrap"
 msgid "Mode"
 msgstr ""
@@ -308,7 +298,7 @@ msgid ""
 "mode should only be used to install a firmware upgrade"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:221
+#: htdocs/luci-static/resources/fs-search.js:219
 msgctxt "footstrap"
 msgid "No pages found"
 msgstr ""
@@ -317,23 +307,23 @@ msgstr ""
 msgid "No password set!"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:325
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:350
 msgctxt "footstrap"
 msgid "Normal"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:476
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:504
 msgctxt "footstrap"
 msgid "Off"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:149
+#: htdocs/luci-static/resources/fs-search.js:147
 msgctxt "footstrap"
 msgid "Pages"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:93
-#: htdocs/luci-static/resources/fs-appearance.js:292
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:94
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:317
 msgctxt "footstrap"
 msgid "Palette"
 msgstr ""
@@ -342,8 +332,8 @@ msgstr ""
 msgid "Password"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:363
-#: htdocs/luci-static/resources/fs-appearance.js:477
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:393
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:505
 msgctxt "footstrap"
 msgid "Pattern"
 msgstr ""
@@ -358,64 +348,64 @@ msgctxt "footstrap"
 msgid "Please choose an image file."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:220
+#: htdocs/luci-static/resources/fs-search.js:218
 msgctxt "footstrap"
 msgid "Recently visited"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:344
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:374
 msgctxt "footstrap"
 msgid "Remove"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:512
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:540
 msgctxt "footstrap"
 msgid "Reset to built-in"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:607
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:635
 msgctxt "footstrap"
 msgid "Reset to built-in — go back to the look the theme ships with."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:511
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:539
 msgctxt "footstrap"
 msgid "Reset to router"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:606
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:634
 msgctxt "footstrap"
 msgid "Reset to router — drop this browser's changes and follow the router."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:335
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:365
 msgctxt "footstrap"
 msgid "Rounding"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:510
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:538
 msgctxt "footstrap"
 msgid "Save to router"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:605
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:633
 msgctxt "footstrap"
 msgid ""
 "Save to router — store this look on the router. Browsers with a look of "
 "their own keep it."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:536
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:564
 msgctxt "footstrap"
 msgid "Saved to router"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:600
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:628
 msgctxt "footstrap"
 msgid "Saving"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:366
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:396
 msgctxt "footstrap"
 msgid "Scale"
 msgstr ""
@@ -425,22 +415,22 @@ msgstr ""
 msgid "Search"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:130
+#: htdocs/luci-static/resources/fs-search.js:129
 msgctxt "footstrap"
 msgid "Search pages"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:144
+#: htdocs/luci-static/resources/fs-search.js:142
 msgctxt "footstrap"
 msgid "Search pages…"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:311
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:336
 msgctxt "footstrap"
 msgid "Sidebar"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:500
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:528
 msgctxt "footstrap"
 msgid "Sidebar and bar"
 msgstr ""
@@ -449,7 +439,7 @@ msgstr ""
 msgid "Skip to content"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-search.js:221
+#: htdocs/luci-static/resources/fs-search.js:219
 msgctxt "footstrap"
 msgid "Start typing to find a page"
 msgstr ""
@@ -458,17 +448,17 @@ msgstr ""
 msgid "Storage"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:367
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:397
 msgctxt "footstrap"
 msgid "Strength"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:318
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:343
 msgctxt "footstrap"
 msgid "Submenus"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:496
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:524
 msgctxt "footstrap"
 msgid "Surfaces"
 msgstr ""
@@ -485,8 +475,13 @@ msgstr ""
 msgid "System running in recovery (initramfs) mode."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-select.js:431
+#: htdocs/luci-static/resources/fs-select.js:440
 msgid "Table"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:356
+msgctxt "footstrap"
+msgid "Text size"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-assets.js:19
@@ -524,14 +519,20 @@ msgctxt "footstrap"
 msgid "The router refused to delete the file (ubus status %d)."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:448
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:296
 msgctxt "footstrap"
 msgid ""
-"The system asks for less transparency or more contrast, so surfaces stay "
-"solid."
+"The system asks for less transparency (on Windows: Transparency effects), so "
+"the router's opacity is not used here. Set it in this browser to turn the "
+"glass on anyway."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:369
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:295
+msgctxt "footstrap"
+msgid "The system asks for more contrast, so surfaces stay solid."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:399
 msgctxt "footstrap"
 msgid "Theme"
 msgstr ""
@@ -542,7 +543,7 @@ msgid ""
 "protect the web interface."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:531
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:559
 msgctxt "footstrap"
 msgid ""
 "This browser is not storing preferences (site data is blocked), so a change "
@@ -550,27 +551,27 @@ msgid ""
 "every browser."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:596
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:624
 msgctxt "footstrap"
 msgid "This theme is not translated on this router yet."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:463
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:491
 msgctxt "footstrap"
 msgid "Tint"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:470
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:498
 msgctxt "footstrap"
 msgid "Tint strength"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:125
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:126
 msgctxt "footstrap"
 msgid "Too faint to read %s"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:312
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:337
 msgctxt "footstrap"
 msgid "Top"
 msgstr ""
@@ -579,7 +580,7 @@ msgstr ""
 msgid "Total Available"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:444
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:473
 msgctxt "footstrap"
 msgid "Transparency"
 msgstr ""
@@ -589,21 +590,26 @@ msgctxt "footstrap"
 msgid "Upload failed."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:414
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:444
 msgctxt "footstrap"
 msgid "Uploading…"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:279
+msgctxt "footstrap"
+msgid "Use the palette's"
 msgstr ""
 
 #: ucode/template/themes/footstrap/sysauth.ut:72
 msgid "Username"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:475
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:503
 msgctxt "footstrap"
 msgid "Wallpaper"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:492
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:520
 msgctxt "footstrap"
 msgid "Warning"
 msgstr ""
@@ -613,22 +619,27 @@ msgid ""
 "You must enable JavaScript in your browser or LuCI will not work properly."
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:500
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:282
+msgctxt "footstrap"
+msgid "Your own surface colours on the Colours tab override the palette."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:528
 msgctxt "footstrap"
 msgid "in the sidebar"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:216
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:215
 msgctxt "footstrap"
 msgid "on a card"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:499
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:527
 msgctxt "footstrap"
 msgid "on a control"
 msgstr ""
 
-#: htdocs/luci-static/resources/fs-appearance.js:464
+#: htdocs/luci-static/resources/view/footstrap/appearance.js:492
 msgctxt "footstrap"
 msgid "on the canvas"
 msgstr ""

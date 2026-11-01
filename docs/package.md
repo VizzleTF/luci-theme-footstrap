@@ -11,6 +11,7 @@ luci-theme-footstrap/
 ├── Makefile
 ├── build-css.sh          styles/ → cascade.css (cat + awk, no node)
 ├── mangle-tokens.sh      shorten the private --fs-* names in a BUILT sheet, then join it to one line
+├── mangle-classes.sh     shorten the theme's own .fs-* class names in a BUILT sheet, JS and templates
 ├── strip-build.sh        build-tree-only bytes out, one mode each: templates, shell, assets
 ├── build-apk.sh          SDK build, kept so the theme stays buildable without owfeed
 ├── dev-sync.sh           deploy to a HARDWARE router over ssh (containers use owlab)
@@ -21,7 +22,7 @@ luci-theme-footstrap/
 ├── htdocs/luci-static/   → /www/luci-static/
 │   ├── footstrap/        cascade.css (GENERATED, gitignored), logo.svg, logo_48.png,
 │   │                     manifest.json, app-icon-192.png (committed, from tools/build-icons.mjs)
-│   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js,
+│   └── resources/        menu-footstrap.js, fs-*.js,
 │                         view/footstrap/appearance.js (System → Footstrap)
 ├── root/                 → /
 │   ├── etc/uci-defaults/30_luci-theme-footstrap
@@ -72,6 +73,9 @@ include $(TOPDIR)/feeds/luci/luci.mk   # absolute: ../../luci.mk resolves only i
 
 - **`LUCI_MINIFY_CSS:=0` is mandatory.** luci.mk's minifier, csstidy, mangles `:has()`,
   `color-mix()` and nested `calc()`. `build-css.sh` minifies instead.
+- **CSS has two pipelines too.** The release (`tools/stage.sh`) runs lightningcss
+  (`tools/minify-css.mjs`) between `build-css.sh` and `mangle-tokens.sh`; an SDK or buildbot build
+  has no node and ships the awk squeeze alone, a few hundred bytes larger and the same on screen.
 - **JS has two pipelines.** The release (`tools/stage.sh`) pre-minifies with uglify-js
   (`tools/minify-js.mjs`) and never runs `luci.mk`. An SDK or buildbot build keeps `luci.mk`'s
   default jsmin over the untouched source. So the source must stay jsmin-safe: see the regex rule
@@ -204,7 +208,8 @@ On a removal it:
 - deletes `luci.themes.Footstrap`;
 - if footstrap is active, sets `mediaurlbase` back to bootstrap, only when both bootstrap's media
   directory and its `header.ut` exist (a half-removed bootstrap is a white page);
-- removes `/etc/footstrap`, the admin's uploads;
+- removes `/etc/footstrap`, the admin's uploads, and the `bg` and `fonts` links uci-defaults made
+  to it under `/www/luci-static/footstrap`, which no package manager owns;
 - clears the LuCI caches.
 
 ## Why postinst/postrm never call `rpcd reload`

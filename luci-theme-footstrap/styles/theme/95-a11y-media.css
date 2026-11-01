@@ -13,17 +13,11 @@
 
 	/* re-states the tokens so every rule reading them follows — docs/css.md "A11y: prefers-contrast token shifts, and the numbers behind them" has why each number */
 	@media (prefers-contrast: more) {
-		/* theme layer outranks the tokens-layer twins (04-nocolormix.css): without color-mix an unguarded
-		 * re-set leaves --fs-hairline, the focus ring and the placeholder ink invalid at use */
-		@supports (color: color-mix(in srgb, red 50%, transparent)) {
-			:root {
-				--fs-border: color-mix(in srgb, var(--fs-text) 45%, var(--fs-bg));
-				--fs-dim: color-mix(in srgb, var(--fs-text) 85%, var(--fs-bg));
-				--fs-faint: color-mix(in srgb, var(--fs-text) 82%, var(--fs-bg));
-				--fs-focus-ring: 0 0 0 3px color-mix(in srgb, var(--fs-accent) 60%, transparent);
-			}
-		}
 		:root {
+			--fs-border: color-mix(in srgb, var(--fs-text) 45%, var(--fs-bg));
+			--fs-dim: color-mix(in srgb, var(--fs-text) 85%, var(--fs-bg));
+			--fs-faint: color-mix(in srgb, var(--fs-text) 82%, var(--fs-bg));
+			--fs-focus-ring: 0 0 0 3px color-mix(in srgb, var(--fs-accent) 60%, transparent);
 			--fs-accent-line: var(--fs-accent);	--fs-accent-line-hi: var(--fs-accent);
 			--fs-good-line: var(--fs-good);		--fs-good-line-hi: var(--fs-good);
 			--fs-danger-line: var(--fs-danger);	--fs-danger-line-hi: var(--fs-danger);
@@ -38,7 +32,6 @@
 	 * border/outline in system keywords, which forced-colors keeps — docs/css.md "A11y:
 	 * forced-colors state repairs". */
 	@media (forced-colors: active) {
-		#tabmenu ul.tabs > li.active > a,
 		.tabs > li.active > a,
 		.cbi-tabmenu > li.cbi-tab > a,
 		.cbi-dropdown[open] > ul.dropdown > li[selected],
@@ -69,7 +62,7 @@
 		 * keep the green/grey state — docs/css.md "A11y: forced-colors state repairs". Selectors repeat the
 		 * glyph rules' own (20-shell, 60-inputs, base/95-luci) with one class or attribute doubled, one step above the original; the two rail selectors already sit at (1,7,0) and still win by file order. */
 		.fs-sidebar.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]::before,
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"],
+		:root[data-sb][data-rail] .fs-sidebar #indicators [data-indicator="poll-status"],
 		input[type="checkbox"][type="checkbox"]:not(:where(.cbi-checkbox > input)):checked::after,
 		input[type="radio"][type="radio"]:checked::after,
 		:is(.btn, .cbi-button).spinning::before {
@@ -77,7 +70,7 @@
 			forced-color-adjust: none;
 		}
 		.fs-sidebar.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]:not([data-style="active"])::before,
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar #indicators [data-indicator="poll-status"]:not([data-style="active"]) {
+		:root[data-sb][data-rail] .fs-sidebar #indicators [data-indicator="poll-status"]:not([data-style="active"]) {
 			background: GrayText;
 		}
 		.cbi-value-description:not(:empty)::before,

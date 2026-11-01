@@ -1,13 +1,8 @@
 @layer page {
 	/* The settings page is ordinary page content: stock .cbi-section cards and .cbi-value rows
-	 * (fs-appearance.js). docs/css.md "Appearance: from popover to page, and what stayed CSS". */
+	 * (view/footstrap/appearance.js). docs/css.md "Appearance: from popover to page, and what stayed CSS". */
 
 	.fs-ap > .fs-ap-card:last-child { margin-bottom: 0; }
-	/* The tab panes are whole cards (ui.tabs, fs-appearance.js). The stock rule hides an inactive
-	 * pane by height and leaves its padding, border and gap standing as an empty bar; nothing in
-	 * these panes measures itself, so it can leave the layout instead. */
-	.fs-ap-panes > [data-tab-title]:not([data-tab-active="true"]) { display: none; }
-
 	/* a subheading splits a card: the eyebrow over the rows it introduces */
 	.fs-ap-sub h4 {
 		margin: var(--fs-space-5) 0 var(--fs-space-1);
@@ -17,8 +12,12 @@
 
 	/* rows are stock .cbi-value with no layout of their own — base/30-forms.css and
 	 * theme/60-inputs.css already draw every other LuCI form this way. docs/css.md above. */
-	:root[data-layout="top"] .fs-ap-submenus { display: none; }
-	/* the glass needs a wallpaper behind it, Material a surface that is glass, Blur a material that blurs */
+	/* The tab panes are whole cards (ui.tabs, view/footstrap/appearance.js). The stock rule hides an inactive
+	 * pane by height and leaves its padding, border and gap standing as an empty bar; nothing in
+	 * these panes measures itself, so it can leave the layout instead.
+	 * The glass needs a wallpaper behind it, Material a surface that is glass, Blur a material that blurs. */
+	.fs-ap-panes > [data-tab-title]:not([data-tab-active="true"]),
+	:root[data-layout="top"] .fs-ap-submenus,
 	:root:not([data-wallpaper]) .fs-ap-glass,
 	:root:not([data-glass]):not([data-glass-bar]) .fs-ap-material,
 	:root[data-material="flat"] .fs-ap-blur { display: none; }
@@ -39,7 +38,7 @@
 		max-inline-size: 100%; padding: var(--fs-space-0-5);
 		background: var(--fs-panel2); border: var(--fs-hairline); border-radius: var(--fs-radius);
 	}
-	.fs-seg > label { position: relative; display: flex; margin: 0; cursor: pointer; }
+	.fs-seg > label { position: relative; display: flex; cursor: pointer; }
 	.fs-seg input[type="radio"] {
 		position: absolute; inset: 0; inline-size: 100%; block-size: 100%; margin: 0;
 		opacity: 0; cursor: pointer;
@@ -77,7 +76,7 @@
 	.fs-color-row { display: flex; align-items: baseline; gap: var(--fs-space-2); }
 	/* native swatch strips the browser's own inset well to the frame's edge (both engines) */
 	input[type="color"].fs-color-swatch {
-		flex: 0 0 auto; align-self: center; inline-size: 34px; block-size: 34px; padding: 0; cursor: pointer;
+		flex: 0 0 auto; align-self: center; inline-size: 2.125rem; block-size: 2.125rem; padding: 0; cursor: pointer;
 		background: none; border: var(--fs-hairline); border-radius: var(--fs-radius-sm);
 	}
 	input[type="color"].fs-color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
@@ -92,7 +91,6 @@
 
 	/* live contrast readout, not a validation, shown only below AA — docs/css.md above */
 	.fs-color-contrast { font-family: var(--fs-font-sans); font-size: var(--fs-type-xs); font-variant-numeric: tabular-nums; }
-	.fs-contrast-aa { color: var(--fs-good); }
 	.fs-contrast-aa-large { color: var(--fs-warn); }
 	.fs-contrast-low { color: var(--fs-danger); }
 
@@ -110,8 +108,8 @@
 		margin-top: var(--fs-space-4); padding-top: var(--fs-space-2-5); border-top: var(--fs-hairline);
 	}
 	.fs-ap-verrow { display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-2-5); }
-	.fs-ap-version { position: relative; font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; text-decoration: none; }
-	.fs-ap-version:hover { color: var(--fs-accent); text-decoration: underline; }
+	.fs-ap-version { position: relative; font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; }
+	.fs-ap-version:hover { color: var(--fs-accent); }
 	/* invisible overlay grows an 84x17 link past the WCAG 2.2 SC 2.5.8 24px floor, to 88x25,
 	 * without moving the text (out of flow, same fix as .cbi-checkbox in theme/60-inputs.css) */
 	.fs-ap-version::before { content: ""; position: absolute; inset: -4px -2px; }
