@@ -1,14 +1,17 @@
 @layer theme {
 	/* honoured globally, every transition here is decoration. This file is the one place for flags against the theme's own rules,
-	 * and there are two: this block (a layer cannot reach base's own transitions) and the forced-colors focus outline below
-	 * .01ms not 0s: a zero duration never fires transitionend, LuCI's teardown waits for one. */
+	 * and there are two: this block (a layer cannot reach base's own transitions) and the forced-colors focus outline below.
+	 * Transitions 0s: a nonzero duration on every element animates `transition-property: all`, the initial value, so WebKit
+	 * stepped an inherited font-size down the tree for ~200ms and a floor measured mid-way kept the old height. */
 	@media (prefers-reduced-motion: reduce) {
 		*, *::before, *::after {
 			animation-duration: .01ms !important;
 			animation-iteration-count: 1 !important;
-			transition-duration: .01ms !important;
+			transition-duration: 0s !important;
 			scroll-behavior: auto !important;
 		}
+		/* .01ms, not 0s: a zero duration never fires transitionend, and ui.Dropdown focuses the open list on it */
+		.cbi-dropdown[open] > ul.dropdown { transition-duration: .01ms !important; }
 	}
 
 	/* re-states the tokens so every rule reading them follows — docs/css.md "A11y: prefers-contrast token shifts, and the numbers behind them" has why each number */

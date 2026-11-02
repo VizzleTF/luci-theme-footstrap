@@ -334,9 +334,10 @@
 		flex-wrap: wrap; gap: var(--fs-space-2); padding-top: var(--fs-space-2);
 	}
 	/* LuCI groups buttons in ONE inner <div>, so this flex-wrap never fires and .fs-main clipped
-	 * the tail button. Copy in theme/65-dropdown.css. */
+	 * the tail button. No grow: a plain button sized to its label, like the ComboButton below,
+	 * where a stretched one stood a card wide beside it. Copy in theme/65-dropdown.css. */
 	.table.fs-stacked .td.cbi-section-actions > :not(.cbi-dropdown) {
-		flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: var(--fs-space-2);
+		flex: 0 1 auto; display: flex; flex-wrap: wrap; gap: var(--fs-space-2);
 	}
 	/* width: 0 — the label's nowrap min-content (288px for a Russian item at 360px) sizes the table-row-group
 	 * past the card (td right 442 vs 315); basis `content` still sizes the item to its label (it was 266px, a whole card, with `1 1 auto`). Copy in theme/65-dropdown.css. */

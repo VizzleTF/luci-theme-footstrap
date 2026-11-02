@@ -110,7 +110,7 @@ at the same opacity. Frosted and Acrylic paint a veil of the ink instead and blu
 each top-level card and the menu, Frosted by 30px and Acrylic by 54px. Blur scales that radius from
 0 to 200%. Floating surfaces take the solid tokens back, because they cover other text:
 modals, open lists, tooltips and the search box. The menu's popups (bar dropdowns, rail flyouts) are
-the menu, so they follow Menu opacity and blur what they cover, Flat included. The export tier follows the
+the menu, so they follow Menu opacity and the menu's material. The export tier follows the
 glass, or an app's tile would sit on a glass card as a solid block.
 
 Contrast on a translucent surface is still undefined: it depends on the pixel behind. So the glass
@@ -129,8 +129,11 @@ descendants, so the card in use (`:hover`, `:focus-within`) is lifted above its 
 blurs nothing behind an element inside a blurred one, so a sticky table cell under Frosted or Acrylic
 relies on a 95% fill instead. For the same reason the bar and the rail blur on a layer under
 themselves (`.fs-sidebar::before`), so their popups can blur the page and still rise over it; the
-expanded sidebar, which scrolls and opens no popup, blurs itself. Flat blurs only what the page scrolls under: the bar and the sticky
-cells, at fixed radii that Blur does not move. The printed page keeps the solid theme.
+expanded sidebar, which scrolls and opens no popup, blurs itself. The menu takes the material the cards
+take: Flat leaves the bar, the sidebar and their popups unblurred, so the page's text shows through
+the bar as it scrolls, and Acrylic adds its grain, lit edge and shadow to the bar and the sidebar.
+Flat's one blur is the sticky table cells, at a fixed radius that Blur does not move. The printed
+page keeps the solid theme.
 
 ### Ink is per palette AND per mode
 

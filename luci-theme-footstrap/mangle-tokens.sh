@@ -161,3 +161,8 @@ while IFS= read -r f; do
 done < "$LIST"
 rm -f "$MAP.ord"
 echo "mangle-tokens: seam renamed in $touched file(s)"
+# A name the map missed: one built at run time ('--fs-' + k), which the sheet no longer reads after
+# the rename (issue #89), or one no rule declares. Prose may still say `--fs-*`.
+if left=$(tr '\n' '\0' < "$LIST" | xargs -0 grep -HnE -- '--fs-([A-Za-z0-9_$"'"'"'`]|$)'); then
+	printf 'mangle-tokens: an --fs- name survived the rename:\n%s\n' "$left" >&2; exit 1
+fi

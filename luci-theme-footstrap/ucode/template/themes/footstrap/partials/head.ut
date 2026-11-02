@@ -263,11 +263,13 @@
 					const mq = (q) => window.matchMedia(q).matches;
 					const solid = mq('(prefers-contrast: more)') || mq('(forced-colors: active)');
 					const rt = mq('(prefers-reduced-transparency: reduce)');
-					const glass = (k, a) => {
-						if (num(k, 0, 100, 100, '--fs-' + k, '%') && !solid && !(rt && lsGet(k) === null)) attr(a, '');
+					/* `p` written out, never built from `k`: mangle-tokens.sh renames only whole literals, so a
+					   built name set a property the sheet no longer reads (issue #89) */
+					const glass = (k, p, a) => {
+						if (num(k, 0, 100, 100, p, '%') && !solid && !(rt && lsGet(k) === null)) attr(a, '');
 					};
-					glass('card-opacity', 'glass');
-					glass('bar-opacity', 'glass-bar');
+					glass('card-opacity', '--fs-card-opacity', 'glass');
+					glass('bar-opacity', '--fs-bar-opacity', 'glass-bar');
 					list('material', [ 'flat', 'acrylic' ]);
 					/* Frosted's and Acrylic's blur, same shape as the tint strength */
 					num('blur', 0, 200, 100, '--fs-blur');

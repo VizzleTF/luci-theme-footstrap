@@ -45,8 +45,8 @@
 		--fs-glass-bar-panel: color-mix(in srgb, var(--fs-panel) var(--fs-bar-opacity), transparent);
 		--fs-glass-bar-inset: var(--fs-glass-inset-on);
 	}
-	/* Flat: everything keeps its own colour at the same opacity, layers compound, and only what the
-	 * page scrolls under is blurred */
+	/* Flat: everything keeps its own colour at the same opacity, layers compound, and nothing is
+	 * blurred but the sticky table cells; the menu follows the cards' material, Flat bar included */
 	:root[data-wallpaper][data-material="flat"]:is([data-glass], [data-glass-bar]) {
 		--fs-glass-inset-on: var(--fs-glass-inset);
 		--fs-glass-track-on: var(--fs-glass-track);
@@ -190,17 +190,23 @@
 	:root[data-wallpaper][data-glass-bar]:not([data-material="flat"]) .fs-sidebar ul.nav ul {
 		backdrop-filter: blur(var(--fs-glass-blur)) saturate(var(--fs-glass-sat));
 	}
-	/* what covers the page's text is blurred in Flat too, plainly and at the base radius, as Flat has
-	 * no Blur slider: the bar the page scrolls under, and every popup */
-	:root[data-wallpaper][data-glass-bar][data-material="flat"]:is([data-layout="top"], [data-narrow]) .fs-sidebar::before,
-	:root[data-wallpaper][data-glass-bar][data-material="flat"] .fs-sidebar ul.nav ul {
-		backdrop-filter: blur(var(--fs-glass-blur-base));
-	}
 	/* the rail's name bubbles are labels over the page, not menus: solid */
 	:root[data-wallpaper][data-glass-bar] .fs-sidebar ul.nav > li > a::after {
 		--fs-panel: var(--fs-glass-o-panel);
 		--fs-border: var(--fs-glass-o-border);
 		--fs-hairline: 1px solid var(--fs-glass-o-border);
+	}
+	/* Acrylic's grain, lit edge and shadow on the menu as on the cards: without them the bar read as
+	 * Frosted with a stronger blur. The bar paints on its layer, the vertical sidebar on itself. */
+	:root[data-wallpaper][data-glass-bar][data-material="acrylic"]:is([data-layout="top"], [data-narrow]) .fs-sidebar::before,
+	:root[data-wallpaper][data-glass-bar][data-material="acrylic"][data-sb] .fs-sidebar {
+		background-image: var(--fs-glass-noise), linear-gradient(160deg, color-mix(in srgb, #fff 7%, transparent), transparent 45%);
+		box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), 0 14px 32px -18px rgb(0 0 0 / .55);
+	}
+	:root[data-wallpaper][data-glass-bar][data-material="acrylic"]:not([data-darkmode="true"]):is([data-layout="top"], [data-narrow]) .fs-sidebar::before,
+	:root[data-wallpaper][data-glass-bar][data-material="acrylic"]:not([data-darkmode="true"])[data-sb] .fs-sidebar {
+		background-image: var(--fs-glass-noise), linear-gradient(160deg, color-mix(in srgb, #fff 45%, transparent), transparent 50%);
+		box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent), 0 14px 32px -20px rgb(0 0 0 / .3);
 	}
 	@media (min-width: 521px) {
 		/* the rail is static: the layer needs it as its containing block, and no z-index, so the

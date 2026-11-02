@@ -1,3 +1,15 @@
+## [Unreleased]
+
+### Changed
+
+- **On a phone, a table row's buttons are as wide as their labels.** When a table folds into cards, a plain button such as Wireless's Disconnect stretched across the card while a button with a menu arrow, in the next row, stayed as wide as its label. Both now keep their label's width.
+- **The menu takes the material the cards take.** The bar and the sidebar ignored it: Flat and Frosted blurred them alike, and Acrylic only blurred harder. Now Flat leaves the menu unblurred, as it leaves the cards, so the page's text shows through the bar as it scrolls under it; Frosted blurs it; Acrylic adds the grain, the lit edge and the shadow the cards have.
+
+### Fixed
+
+- **Transparent cards and menu stay transparent after a reload ([#89](https://github.com/VizzleTF/luci-theme-footstrap/issues/89)).** Since 0.14.19 the page drew the glass while you moved the opacity slider and lost it on the next load: the code that applies settings before the first paint wrote the opacity under the property's long name, which the 0.14.19 build shortens everywhere else. The build now stops when a theme property name is left unshortened.
+- **With reduced motion turned on, a change of density or text size lays the page out as a reload would.** The rule that cuts animations short gave every element a tiny transition, so a new font size crept down the page over about 200ms. In Safari a form card kept up to 3px of its old height, and in Chrome a sticky table header sat 7px under the bar after a switch to Large, both until the next reload.
+
 ## [0.14.19] — 2026-11-01
 
 ### Added
