@@ -42,9 +42,11 @@ function run(records) {
  * document that was never that short. Written before the tick (a pin in the same statement
  * sequence is never laid out: 1882px still clamped away) and on the containers, never the column,
  * where it suppresses the engine's own anchoring (css-scroll-anchoring-1 §2.2.2) and cost 120px of
- * growth, all 120px. The selector covers what `dom.content()` empties: a section body and a table
- * (a table's body climbs to the same box). */
-const SHRINKS = '.cbi-section > div, .table';
+ * growth, all 120px. The selector covers what `dom.content()` empties: a section body, a table
+ * (a table's body climbs to the same box), and luci-mod-dashboard's KPI row, charts and tab map,
+ * which sit straight under `.Dashboard`. Without their floor WebKit 27.2 put a reader 526px down
+ * the dashboard at 0 on every poll, at 1280, 820 and 390px alike. */
+const SHRINKS = '.cbi-section > div, .table, .Dashboard > div';
 
 const FLOORED = '[data-fs-floor]';
 
