@@ -151,6 +151,9 @@ function scrollTop() {
 	const sc = scroller();
 	return sc ? sc.scrollTop : window.scrollY;
 }
+function docHeight() {
+	return (scroller() || document.documentElement).scrollHeight;
+}
 
 function scrolling() { return Date.now() < _movingUntil; }
 function sampleMotion() {
@@ -278,7 +281,7 @@ function rememberRest(force) {
 	const ref = anchorRef();
 	_restAt = scrollTop();
 	_restPage = pageStamp();
-	_rest = ref ? { el: ref.el, top: ref.top, at: _restAt, sec: ref.sec, secTop: ref.secTop } : null;
+	_rest = ref ? { el: ref.el, top: ref.top, at: _restAt, sec: ref.sec, secTop: ref.secTop, tall: ref.tall } : null;
 }
 
 function anchorFor() {
@@ -287,11 +290,11 @@ function anchorFor() {
 	if (!_rest || !_rest.el.isConnected) {
 		if (clamped) return { by: _restAt - at };
 		if (_rest && _rest.sec && _rest.sec.isConnected && at === _restAt)
-			return { el: _rest.sec, top: _rest.secTop, slack: 0 };
+			return { el: _rest.sec, top: _rest.secTop, slack: 0, tall: _rest.tall };
 		return anchorRef();
 	}
 	if (at !== _rest.at && !clamped) return null;
-	return { el: _rest.el, top: _rest.top, slack: Math.max(0, _rest.at - at) };
+	return { el: _rest.el, top: _rest.top, slack: Math.max(0, _rest.at - at), tall: _rest.tall };
 }
 
 function anchorRef() {
@@ -328,7 +331,7 @@ function anchorRef() {
 		keep = keep.parentElement;
 	if (keep === host) keep = null;
 	return { el, top: el.getBoundingClientRect().top,
-		sec: keep, secTop: keep ? keep.getBoundingClientRect().top : 0 };
+		sec: keep, secTop: keep ? keep.getBoundingClientRect().top : 0, tall: docHeight() };
 }
 
 let _anchorPending = null;
@@ -377,7 +380,11 @@ function applyAnchor(ref) {
 	if (!ref.el.isConnected) return;
 	const drift = ref.el.getBoundingClientRect().top - ref.top;
 	if (Math.abs(drift) < 1) return;			/* nothing needed correcting here */
-	if (Math.abs(drift) > (window.innerHeight || 0) + 200 + (ref.slack || 0)) return;
+	/* The cap: one viewport, or what the document grew or shrank since `ref`, whichever is more. A
+	 * subtree swap moves a reference by thousands while the height holds; five leases at 390px move it
+	 * 1290px, past an 844px viewport's 1044px, and the document grew all 1290. */
+	const grew = Math.abs(docHeight() - ref.tall);
+	if (Math.abs(drift) > Math.max(window.innerHeight || 0, grew) + 200 + (ref.slack || 0)) return;
 	writeOffset(at + drift);
 	return true;
 }

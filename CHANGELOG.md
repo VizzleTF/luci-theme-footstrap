@@ -3,6 +3,7 @@
 ### Fixed
 
 - **Safari no longer throws you back to the top of luci-mod-dashboard on every refresh.** Scrolled down the dashboard in Safari 27.2 (macOS and iPadOS), the page jumped to the top each time the WAN traffic and System load graphs updated, about every 5 seconds. The dashboard rebuilds its KPI row, charts and tabs on each refresh, and the theme's guard that keeps a page from getting shorter mid-refill didn't cover those boxes. It does now; a reader 526px down at 1280px wide stays there instead of landing at 0, and at 820 and 390px likewise. The dashboard keeps its container queries.
+- **Safari before 27 keeps your place on a phone when a refresh adds a lot above you.** Safari and iOS before 27 have no scroll anchoring, so the theme moves the page back itself, and it refused any move longer than the screen plus 200px. Five new DHCP leases on Status > Overview at 390px wide add 1290px above the reader, past an 844px screen's 1044px, so the page jumped by all of it. The limit now also allows as much as the page itself grew or shrank; a view that swaps its whole content without changing height is still not followed.
 
 ## [0.14.20] — 2026-11-02
 
