@@ -12,6 +12,8 @@
  *     shrink are judged apart, each from a fresh park, by the same rules, and the shrink once more
  *     under a reader who keeps the wheel going through the tick and is read once they let go
  *     (bootstrap is no reference there: it floors nothing, so nothing is left to change).
+ *   - a second stop, luci-mod-dashboard: a reader at the page's bottom through two of its own polls,
+ *     footstrap and bootstrap cells only (docs/verifying.md).
  *
  * Four cells per engine and width, on the same router and engine:
  *   bootstrap  the stock theme, the reference
@@ -27,7 +29,8 @@
  * above the reader (their content's move in the document: the offset's share and the viewport's),
  * the lease rows never came or went in its view, no tick landed while they scrolled, they never held
  * still after, fewer than MIN_TRACKED elements were seen, the no-native cells measured another
- * page, or the stand stopped answering.
+ * page, or the stand stopped answering. On the dashboard: the reader parked less than DASH_DEPTH
+ * down, no poll refilled it while they were watched, or fewer than MIN_TRACKED elements were seen.
  *
  *   node tools/anchor-check.mjs --router owrt2512 [--engines chromium,firefox,webkit] [--widths 1280,390] [--rows 4]
  *
@@ -69,6 +72,8 @@ const TOL = 2;			/* px: rounding of a median over sub-pixel boxes */
 const ABOVE_TOL = 8;		/* px: two cells of one page saw the same change above the reader */
 const MIN_TRACKED = 5;
 const SECS = 15;		/* sampling window; the growth is written 1.5 s in, a poll is 5 s */
+const DASH_SECS = 12;		/* the dashboard's window: two of its polls and their refill */
+const DASH_DEPTH = 100;		/* px: a dashboard reader parked less deep has little offset to lose */
 
 const sh = (script, input) => {
 	try {
@@ -186,6 +191,10 @@ const SAMPLE = async ([ secs, tol, still, y0 ]) => {
 	};
 	const t0 = performance.now(), top0 = sc.scrollTop, h0 = sc.scrollHeight;
 	let last = null, max = 0, off = 0, painted = 0;
+	/* the ticks that refilled the view: bursts of node swaps, a second apart */
+	let ticks = 0, swapAt = -Infinity;
+	const mo = new MutationObserver(() => { const t = performance.now(); if (t - swapAt > 1000) ticks++; swapAt = t; });
+	mo.observe(view, { childList: true, subtree: true });
 	/* What the reader is shown: a ResizeObserver callback runs after every animation frame callback
 	 * of its frame, the theme's correction included, and before the paint. The view resizes in the
 	 * frame the growth lands in. */
@@ -207,12 +216,14 @@ const SAMPLE = async ([ secs, tol, still, y0 ]) => {
 		requestAnimationFrame(step);
 	});
 	ro.disconnect();
+	mo.disconnect();
 	const r1 = (x) => Math.round(x * 10) / 10;
 	/* what changed above the reader: their content's move in the document, the offset's share and
 	 * the viewport's. The document's own height also counts what changed below them. */
 	const scrolled = Math.round(sc.scrollTop - top0);
 	return { tracked: last ? last.n : 0, grew: Math.round(sc.scrollHeight - h0), scrolled,
-		above: last ? Math.round(scrolled + last.d) : 0, end: last ? r1(last.d) : null, max: r1(max), off, painted,
+		above: last ? Math.round(scrolled + last.d) : 0, end: last ? r1(last.d) : null, max: r1(max), off, painted, ticks,
+		depth: Math.round(top0),
 		rows: view.textContent.includes('anchor-check-'),
 		/* ms from the last wheel event the page saw to the start, for the log */
 		lag: Math.round(t0 - (window.__acWheelAt || t0)) };
@@ -238,24 +249,33 @@ const NO_NATIVE = () => {
 	else document.addEventListener('DOMContentLoaded', add);
 };
 
-/* A page opens logged in: `cookies` is the session phase() logged into once for its engine */
-async function open(browser, width, cell, cookies) {
-	const ctx = await browser.newContext({ viewport: { width, height: width > 500 ? 800 : 844 },
-		storageState: { cookies, origins: cell === 'nnOff' ? [ { origin: new URL(BASE).origin, localStorage: [ { name: 'fsAnchor', value: 'off' } ] } ] : [] } });
+/* A load that timed out on a stand that answers measured nothing, and is measured again; WebKit and
+ * Firefox run only here, so theme code that holds their load must not read as the stand. A view
+ * that never renders leaves nothing to park on: that cell measured nothing (valid()) */
+async function load(page, browser, path, title) {
+	await page.goto(`${BASE}/${path}`, { waitUntil: 'load' }).catch(async (e) => {
+		const r = await stoodDown(e, stand.id, BASE, `${title} did not load in ${browser.browserType().name()}`);
+		throw r === e || r instanceof StandDown ? r : Object.assign(r, { unmeasured: true });
+	});
+	await page.waitForFunction(() => { const v = document.getElementById('view');
+		return v && v.children.length && !v.querySelector(':scope > .spinning'); }, null, { timeout: 30000 }).catch(() => {});
+}
+
+/* A context logged in: `cookies` is the session phase() logged into once for its engine */
+async function context(browser, width, cookies, origins = []) {
+	const ctx = await browser.newContext({ viewport: { width, height: width > 500 ? 800 : 844 }, storageState: { cookies, origins } });
 	await sealToRouter(ctx, BASE);
 	/* when the page last saw the wheel: SAMPLE's `lag`, never its clock */
 	await ctx.addInitScript(() => addEventListener('wheel', () => { window.__acWheelAt = performance.now(); }, { capture: true, passive: true }));
+	return ctx;
+}
+
+async function open(browser, width, cell, cookies) {
+	const ctx = await context(browser, width, cookies,
+		cell === 'nnOff' ? [ { origin: new URL(BASE).origin, localStorage: [ { name: 'fsAnchor', value: 'off' } ] } ] : []);
 	const page = await ctx.newPage();
 	if (cell.startsWith('nn')) await page.addInitScript(NO_NATIVE);
-	/* a load that timed out on a stand that answers measured nothing, and is measured again; WebKit and
-	 * Firefox run only here, so theme code that holds their load must not read as the stand */
-	await page.goto(`${BASE}/admin/status/overview`, { waitUntil: 'load' }).catch(async (e) => {
-		const r = await stoodDown(e, stand.id, BASE, `Status > Overview did not load in ${browser.browserType().name()}`);
-		throw r === e || r instanceof StandDown ? r : Object.assign(r, { unmeasured: true });
-	});
-	/* a view that never renders leaves nothing to park on: that cell measured nothing (valid()) */
-	await page.waitForFunction(() => { const v = document.getElementById('view');
-		return v && v.children.length && !v.querySelector(':scope > .spinning'); }, null, { timeout: 30000 }).catch(() => {});
+	await load(page, browser, 'admin/status/overview', 'Status > Overview');
 	await page.waitForFunction(`(${PARK})(${JSON.stringify(firstMac)}) != null`, null, { timeout: 30000 }).catch(() => {});
 	await page.waitForTimeout(6000);	/* the first tick has landed and the layout settled */
 	return { ctx, page, parked: await park(page, width) };
@@ -286,6 +306,33 @@ async function park(page, width) {
 		if (after == null || Math.abs(after) >= 12) console.log(`  park: ${after == null ? 'lost the section' : Math.round(after) + 'px off'} after the hold, ${i} steps`);
 	}
 	return at != null;
+}
+
+/* The dashboard's reader: wheeled to the bottom of the page, where a clamp takes the most, and holding
+ * still there. Its own polls are the change: they refill the KPI row, the charts and the tab map. */
+const OFFSET = () => {
+	const mc = document.getElementById('maincontent');
+	const sc = (mc && /(auto|scroll)/.test(getComputedStyle(mc).overflowY)) ? mc : document.scrollingElement;
+	return { top: sc.scrollTop, max: sc.scrollHeight - sc.clientHeight };
+};
+async function openDash(browser, width, cookies) {
+	const ctx = await context(browser, width, cookies);
+	const page = await ctx.newPage();
+	await load(page, browser, 'admin/dashboard', 'Dashboard');
+	await page.waitForFunction(() => document.querySelectorAll('#view .Dashboard > div').length, null, { timeout: 30000 }).catch(() => {});
+	await page.waitForTimeout(6000);	/* the first tick has landed and the layout settled */
+	await page.mouse.move(Math.round(width / 2), Math.round(page.viewportSize().height / 2));
+	/* WebKit scrolls asynchronously: done once the offset is at the bottom and held over two reads */
+	let prev = -1;
+	for (let i = 0; i < 100; i++) {
+		const o = await page.evaluate(OFFSET);
+		if (o.top >= o.max - 1 && o.top === prev) break;
+		prev = o.top;
+		await page.mouse.wheel(0, 120);
+		await page.waitForTimeout(i % 10 === 9 ? 400 : 60);
+	}
+	await page.waitForTimeout(1500);	/* the reader holds still */
+	return { ctx, page, parked: !!(await page.$('#view .Dashboard')) };
 }
 
 /* The reader keeps the wheel going, 20px a step down and up around their place, until the tick that
@@ -336,7 +383,17 @@ async function phase(name, browsers, cells) {
 		await seed.close();
 	}
 	laps.push(lap('login'));
-	const pages = await Promise.all(cells.map((c) => open(browsers[c.engine], c.width, c.cell, cookies[c.engine])));
+	/* the dashboard first, its own polls the only change: no lease is written while it is watched */
+	const dash = cells.filter((c) => c.dash);
+	cells = cells.filter((c) => !c.dash);
+	if (dash.length) {
+		const dp = await Promise.all(dash.map((c) => openDash(browsers[c.engine], c.width, cookies[c.engine])));
+		const out = await Promise.all(dp.map((p) => (p.parked ? p.page.evaluate(SAMPLE, [ DASH_SECS, TOL, 0 ]) : null)));
+		dash.forEach((c, i) => { c.res = { dashboard: out[i] }; });
+		await Promise.all(dp.map((p) => p.ctx.close()));
+		laps.push(lap('dashboard'));
+	}
+	const pages =await Promise.all(cells.map((c) => open(browsers[c.engine], c.width, c.cell, cookies[c.engine])));
 	laps.push(lap('open'));
 	const repark = () => Promise.all(pages.map(async (p, i) => { p.parked = p.parked && await park(p.page, cells[i].width); }));
 	for (const [ kind, change ] of [ [ 'grow', grow ], [ 'shrink', shrink ] ]) {
@@ -402,16 +459,29 @@ const valid = (x, kind, where) => {
 	else return true;
 	return false;
 };
+/* the dashboard's reader: deep enough to lose something, and a poll refilled the page under them */
+const validDash = (x, where) => {
+	if (!x) fails.push(`${where}: the dashboard did not render — measured nothing`);
+	else if (x.depth < DASH_DEPTH) fails.push(`${where}: the reader parked ${x.depth}px down — measured nothing`);
+	else if (x.ticks < 1) fails.push(`${where}: no poll refilled the dashboard in ${DASH_SECS} s — measured nothing`);
+	else if (x.tracked < MIN_TRACKED) fails.push(`${where}: ${x.tracked} elements seen — measured nothing`);
+	else return true;
+	return false;
+};
 
 const engines = opt.engines.split(','), widths = opt.widths.split(',').map(Number);
 let cells;
 if (!firstMac) { console.error(`${stand.id}: ${LEASES} has no lease to find the section by`); process.exit(2); }
 
 /* One measurement of every cell. Footstrap runs one engine at a time, six pages; bootstrap's two
- * cells per engine run as one phase across the engines, the same six pages' load. */
+ * cells per engine run as one phase across the engines, the same six pages' load. Each phase opens
+ * its dashboard pages first and closes them before the Overview's open. */
 async function measure() {
 	cells = [];
-	for (const e of engines) for (const w of widths) for (const cell of [ 'fs', 'nn', 'nnOff', 'bs' ]) cells.push({ engine: e, width: w, cell });
+	for (const e of engines) for (const w of widths) {
+		for (const cell of [ 'fs', 'nn', 'nnOff', 'bs' ]) cells.push({ engine: e, width: w, cell });
+		for (const cell of [ 'fs', 'bs' ]) cells.push({ engine: e, width: w, cell, dash: true });
+	}
 	/* from the leases the run found, whatever the last measurement left: a stand that stopped
 	 * answering mid-phase refused its cleanup below too, and a growth over the rows it left swaps
 	 * them for its own and measures nothing. The theme is set below before any page opens */
@@ -445,7 +515,7 @@ function judgeAll() {
 	fails = [];
 	for (const e of engines) for (const w of widths) for (const kind of [ 'grow', 'shrink', 'scroll' ]) {
 		const k = `${e}@${w} ${kind}`;
-		const c = Object.fromEntries(cells.filter((x) => x.engine === e && x.width === w).map((x) => [ x.cell, x.res && x.res[kind] ]));
+		const c = Object.fromEntries(cells.filter((x) => x.engine === e && x.width === w && !x.dash).map((x) => [ x.cell, x.res && x.res[kind] ]));
 		const show = (x) => (!x ? '-' : x.missed ? 'missed' : x.restless ? 'restless'
 			: `${x.end}/${x.max}/${x.off}f/${x.painted}p of ${x.above}px t${x.tracked} g${x.grew}${x.lag != null ? ` lag${x.lag}` : ''}`);
 		console.log(`${k}: reader moved (end/max/frames off/painted off of the change) footstrap ${show(c.fs)}, bootstrap ${show(c.bs)}; `
@@ -476,6 +546,19 @@ function judgeAll() {
 		 * whether a painted frame showed it */
 		else if (c.nn.painted > 0)
 			fails.push(`${k}: without native anchoring footstrap painted the reader off place in ${c.nn.painted} frames (up to ${c.nn.max}px)`);
+	}
+	/* The dashboard: footstrap may not move the reader further, nor in more frames, than bootstrap.
+	 * Its clamp resizes nothing on #view, so `painted` stays 0 there; `off` sees it: over 600 frames at 1280 */
+	for (const e of engines) for (const w of widths) {
+		const k = `${e}@${w} dashboard`;
+		const c = Object.fromEntries(cells.filter((x) => x.engine === e && x.width === w && x.dash).map((x) => [ x.cell, x.res && x.res.dashboard ]));
+		const show = (x) => (!x ? '-' : `${x.end}/${x.max}/${x.off}f/${x.painted}p from ${x.depth}px t${x.tracked} ${x.ticks} ticks`);
+		console.log(`${k}: reader moved (end/max/frames off/painted off, parked depth) footstrap ${show(c.fs)}, bootstrap ${show(c.bs)}`);
+		if (![ 'fs', 'bs' ].map((n) => validDash(c[n], `${k} ${n}`)).every(Boolean)) continue;
+		if (Math.abs(c.fs.end) > Math.abs(c.bs.end) + TOL)
+			fails.push(`${k}: footstrap left the reader ${c.fs.end}px off where bootstrap left ${c.bs.end}px`);
+		else if (c.fs.off > c.bs.off || c.fs.painted > c.bs.painted)
+			fails.push(`${k}: footstrap showed the reader off place in ${c.fs.off} frames, ${c.fs.painted} painted (up to ${c.fs.max}px), bootstrap in ${c.bs.off}, ${c.bs.painted} painted`);
 	}
 }
 
