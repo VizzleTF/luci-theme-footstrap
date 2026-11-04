@@ -16,6 +16,8 @@
 
 	/* 600px is cramped for a table form (.cbi-map cards on a big screen); vw widens toward 1100 on desktop only */
 	.modal:has(.cbi-map) { max-width: min(68.75rem, 94vw); }
+	/* a command log (Package Manager) wrapped at 70 mono columns in 600px; 900px holds 108 (13px JetBrains Mono) */
+	.modal:has(> pre) { max-width: min(56.25rem, 94vw); }
 
 	/* no HORIZONTAL scroll ever (measured 634px scroll vs 530px room) — docs/css.md "Modal: no horizontal scroll, ever" */
 	#modal_overlay .modal label.btn {
