@@ -28,6 +28,8 @@ const MUTANTS = [
 		from: '\tif (scrolling() || !fittersEnabled()) return;\n\tconst host', to: '\treturn;\n\tconst host' },
 	{ name: 'no-deferred-floor', why: 'a floor met mid-scroll is never settled afterwards',
 		from: '_deferredFloors.add(b);', to: 'void b;' },
+	{ name: 'no-dashboard-floor', why: 'luci-mod-dashboard\'s refilled boxes get no floor',
+		from: "const SHRINKS = '.cbi-section > div, .table, .Dashboard > div';", to: "const SHRINKS = '.cbi-section > div, .table';" },
 ];
 
 const args = process.argv.slice(2);

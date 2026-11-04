@@ -267,8 +267,9 @@ with `tools/ci-install.sh`: copied in and installed by apk or opkg with no feed 
 back as installed. It is not `owlab install`, which under owlab 0.6.7 refreshes every feed and
 installs again when a dependency is missing: a feed outage would stand between the job and its
 verdict. The package needs only luci-base, which every stand has. One poll tick grows Status >
-Overview above a parked reader, and one shrinks it back. Each must leave the reader where
-bootstrap does, in Chromium, Firefox and WebKit ([verifying.md](verifying.md) "What the check
+Overview above a parked reader, and one shrinks it back; on luci-mod-dashboard, two of its own polls
+refill the page under a reader parked at its bottom. Each must leave the reader where bootstrap
+does, in Chromium, Firefox and WebKit ([verifying.md](verifying.md) "What the check
 proves"). Its log is uploaded as artifact `anchor-<router>`.
 
 The check judges nothing when it exits 3 (the stand stopped answering before its first measurement
