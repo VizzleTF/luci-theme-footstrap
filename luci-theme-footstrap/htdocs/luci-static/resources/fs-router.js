@@ -176,6 +176,21 @@ function bodyLittered() {
 	return littered;
 }
 
+/* ---- a flushed menu makes the next navigation a full load ----
+ * luci-app-package-manager calls ui.menu.flushCache() after an install, upgrade or removal. The
+ * menu tree and every view class this document required may then be stale: a revisit would rerun
+ * the old module. */
+let _menuFlushed = false;
+function watchMenuFlush() {
+	const menu = ui.menu;
+	if (!menu || typeof menu.flushCache !== 'function') return;
+	const flush = menu.flushCache;
+	menu.flushCache = function () {
+		_menuFlushed = true;
+		return flush.apply(this, arguments);
+	};
+}
+
 let _curPath = window.location.pathname;
 let _curSearch = window.location.search;
 let _navGen = 0;
@@ -496,6 +511,8 @@ function navigate(pathname, push, kbd) {
 
 	if (bodyLittered()) return false;
 
+	if (_menuFlushed) return false;
+
 	/* an extension's lodash/underscore replaced window._: LuCI's own `_('x').format()` then throws on every view; a full load restores it */
 	if (typeof _ !== 'function' || typeof _('') !== 'string') return false;
 
@@ -798,6 +815,7 @@ document.addEventListener('poll-stop', () => {
 });
 
 watchSession();
+watchMenuFlush();
 
 const _navCbs = [];
 function onNavigate(fn) { if (typeof fn === 'function') _navCbs.push(fn); }

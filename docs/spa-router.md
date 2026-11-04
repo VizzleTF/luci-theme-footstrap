@@ -70,6 +70,8 @@ without `depends.acl` are skipped, as in the dispatcher.
    when any of these holds:
    - `documentPoisoned()`: an invasive foreign stylesheet is in the document;
    - `bodyLittered()`: a script left a node of its own on `<body>`;
+   - `ui.menu.flushCache()` ran in this document: luci-app-package-manager calls it after an
+     install, upgrade or removal, so the menu tree and every view class required so far may be stale;
    - an extension's lodash/underscore replaced `window._` (openwrt/luci#7817, #8342);
    - the session is known to be dead (see "A dead session ends the document");
    - the node has no view class (`viewClassFor()`), or its `menu.d` `css` is not in the document;
