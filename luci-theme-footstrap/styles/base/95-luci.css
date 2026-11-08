@@ -422,7 +422,9 @@
 	 * absolutely positioned: docs/css.md "base/95-luci.css: the spinner glyph sits in the flow, on
 	 * purpose" (issues #15, #22). */
 	.spinning::before {
-		--spinner-icon: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' stroke='red' stroke-width='3' fill='none'><circle cx='10' cy='10' r='8' stroke-opacity='.5'/><path d='M10 2c4 0 8 4 8 8'/></svg>");
+		/* The head is a quarter dash of the track's own circle (2π·8/4), not a Bézier arc: the curve
+		 * bulged past the track. < and > percent-encoded, as a URL requires. */
+		--spinner-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' stroke='red' stroke-width='3' fill='none'%3E%3Ccircle cx='10' cy='10' r='8' stroke-opacity='.5'/%3E%3Ccircle cx='10' cy='10' r='8' stroke-dasharray='12.57 37.7' transform='rotate(-90 10 10)'/%3E%3C/svg%3E");
 
 		display: inline-block;
 		flex: 0 0 auto;
