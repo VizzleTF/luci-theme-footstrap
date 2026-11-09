@@ -48,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mutant: [sync-scroll, late-frame, no-correction, no-floor, no-deferred-floor]
+        mutant: [sync-scroll, late-frame, no-correction, no-floor, no-deferred-floor, no-dashboard-floor]
     # The steps up to the install are build.yml's `anchor` on owrt2512, without its RUN gate.
     steps:
       - uses: actions/checkout@v7

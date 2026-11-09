@@ -40,7 +40,7 @@ job (`gh run view <id>`):
 |---|---|
 | `build` | both formats, built by `owfeed build` |
 | `e2e` | `tools/e2e.mjs` on owrt2512 (25.12/apk) and owrt2410 (24.10/opkg): install the last release, upgrade to this build, open every menu page against bootstrap, remove, fresh install ([verifying.md](verifying.md)) |
-| `anchor` | `tools/anchor-check.mjs` on owrt2512 and owrt2410, beside `e2e`: a poll tick above a parked reader in Chromium, Firefox and WebKit ([verifying.md](verifying.md)) |
+| `anchor` | `tools/anchor-check.mjs` on owrt2512 and owrt2410, beside `e2e`: a poll tick above a parked reader on Status > Overview and luci-mod-dashboard, in Chromium, Firefox and WebKit ([verifying.md](verifying.md)) |
 
 `playground` runs on every push to `main` that reaches the package, on the tag and on a dispatch
 (`gh workflow run build.yml --ref main`); the runbook's step 0 reads it with the rest of the main

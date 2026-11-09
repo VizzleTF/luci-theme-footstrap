@@ -135,6 +135,17 @@ A cell that measured nothing fails. It measured nothing when:
 - Status > Overview did not load in 30 s while LuCI's root answered;
 - the stand stopped answering.
 
+A second stop runs on luci-mod-dashboard (`admin/dashboard`), at the same engines and widths.
+Nothing is changed there: the dashboard's own poll rebuilds its KPI row, charts and tab map every
+5 s with `dom.content()`, and the page keeps its height. The reader is wheeled to the bottom of the
+page, where a clamp takes the most, and watched for 12 s, two polls. The elements are tracked as
+above, and two cells, footstrap and bootstrap, are judged as the first two rows of the table. The
+clamp leaves `#view`'s size alone, so no painted frame counts it; the sampled frames do.
+WebKit 27.2 put a reader 526 px down at 0 on every poll until `fs-fit.js` floored the boxes under
+`.Dashboard` ([#90](https://github.com/VizzleTF/luci-theme-footstrap/pull/90)). That cell measured
+nothing when the reader parked less than 100 px down, no poll refilled the view while they were
+watched, fewer than 5 elements were tracked, or the dashboard did not render.
+
 The step fails with every `FAIL` line in its detail. The check gives up on itself after 20 min
 with a `FAIL`. The router needs at least one lease in `/tmp/dhcp.leases` (owlab's fixtures seed
 them).
@@ -162,8 +173,9 @@ What it does not judge, so a change there is looked at by hand on both routers (
   no real Safari runs;
 - the sidebar and rail layouts, the palettes, RU text and RTL: the run uses the defaults (the top
   bar, the default palette, English);
-- the reader's scroll position, except on the anchoring check's one page under its three changes
-  (a growth and a shrink under a reader holding still, a shrink under one scrolling);
+- the reader's scroll position, except on the anchoring check's two pages: Status > Overview
+  under its three changes (a growth and a shrink under a reader holding still, a shrink under one
+  scrolling) and the dashboard under its own polls;
 - a change below the reader, and Back after a client navigation;
 - a page reached only through a tab strip, by a click (it is still opened by a full load);
 - `install.sh`, the feed and the trust chain — e2e installs package files directly;
