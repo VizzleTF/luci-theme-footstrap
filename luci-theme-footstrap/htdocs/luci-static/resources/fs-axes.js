@@ -219,7 +219,7 @@ const FS_PSTR_DEFAULT = 20;
 const PSTR = propAxis('fs-pattern-strength', 'pattern_strength', '--fs-pattern-strength', 0, 100, FS_PSTR_DEFAULT, (v) => String(v / 100));
 const PINK = enumAxis('fs-pattern-ink', 'data-pattern-ink', 'original', 'theme');
 
-/* Transparency (issue #87): the cards and the menu as glass over a wallpaper, 100% = solid. The
+/* Transparency: the cards and the menu as glass over a wallpaper, 100% = solid. The
  * attribute that switches the glass on is derived, not stored: set below 100% unless the OS asks
  * for more contrast or forces colours, which a glass card cannot honour. Less transparency holds
  * back only an opacity that came from the router: Windows' "Transparency effects" switch reaches

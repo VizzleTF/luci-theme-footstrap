@@ -264,7 +264,7 @@
 					const solid = mq('(prefers-contrast: more)') || mq('(forced-colors: active)');
 					const rt = mq('(prefers-reduced-transparency: reduce)');
 					/* `p` written out, never built from `k`: mangle-tokens.sh renames only whole literals, so a
-					   built name set a property the sheet no longer reads (issue #89) */
+					   built name set a property the sheet no longer reads */
 					const glass = (k, p, a) => {
 						if (num(k, 0, 100, 100, p, '%') && !solid && !(rt && lsGet(k) === null)) attr(a, '');
 					};

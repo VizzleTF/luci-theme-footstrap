@@ -111,7 +111,7 @@
 					</a>
 					{#
 						The three chrome icons below are the same 24x24 outline differing only in path data;
-						the stroke is `.fs-ico` in theme/20-shell.css, not attributes, and fs-widgets.js's
+						the stroke is `.fs-ico` in theme/20-shell.css, not attributes, and fs-chrome.js's
 						svgIcon() emits the same markup client-side. aria-hidden: each sits beside its own label.
 					#}
 					<button type="button" class="fs-railtoggle" id="fs-rail-toggle" aria-label="{{ _('Collapse menu') }}" title="{{ _('Collapse menu') }}">
