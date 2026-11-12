@@ -20,7 +20,7 @@ of the checkout, outside it.
 4. Prove a CSS change with a computed-style diff. `tools/e2e.mjs` and `tools/anchor-check.mjs` do
    not judge how a page looks: [What proves what](#what-proves-what).
 5. Run `tools/e2e.mjs` last, on a router reset with `owlab up --rebuild <router>`. Why: e2e wants a
-   router without the theme, and a sync puts the theme on it: [verifying.md](verifying.md).
+   router without the theme, and a sync puts the theme on it: [run-checks.md](run-checks.md).
 6. Before you trust a measurement, read [stand-traps.md](stand-traps.md).
 7. Anything that touches the build pipeline is measured on a package: `./tools/stage.sh && owfeed build`.
 
@@ -41,17 +41,42 @@ of the checkout, outside it.
 6. Look at the change by hand on both routers:
    [The test matrix](#the-test-matrix-pages-and-modes-to-check-by-hand).
 7. Stop `owlab sync --watch`. Then run e2e on each router, which also runs `tools/anchor-check.mjs`
-   at the end of its step 4, while footstrap is active. Exact commands:
-   [verifying.md, "Run e2e on both routers"](verifying.md#run-e2e-on-both-routers). In short:
+   at the end of its step 4, while footstrap is active. Details and exit codes:
+   [run-checks.md, "Run e2e on both routers"](run-checks.md#run-e2e-on-both-routers).
    1. Build: `FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && owfeed build`.
-   2. Download the last release:
-      `rm -rf ../tmp/old-apk && gh release download --repo VizzleTF/luci-theme-footstrap --pattern 'luci-theme-footstrap-*.apk' --dir ../tmp/old-apk`.
-      Expected: `ls ../tmp/old-apk` prints one file. The ipk line for `owrt2410` is in verifying.md.
-   3. Reset the router: `owlab up --rebuild owrt2512`. e2e needs a router without the theme.
-   4. Run `node tools/e2e.mjs --router owrt2512 …`, then the same on `owrt2410`.
+   2. Download the last release, one directory per package format. Expected: each `ls` prints one
+      file.
+
+      ```sh
+      rm -rf ../tmp/old-apk && gh release download --repo VizzleTF/luci-theme-footstrap \
+        --pattern 'luci-theme-footstrap-*.apk' --dir ../tmp/old-apk
+      ls ../tmp/old-apk
+      rm -rf ../tmp/old-ipk && gh release download --repo VizzleTF/luci-theme-footstrap \
+        --pattern 'luci-theme-footstrap_*_all.ipk' --dir ../tmp/old-ipk
+      ls ../tmp/old-ipk
+      ```
+
+   3. Reset `owrt2512` and run e2e on it. e2e needs a router without the theme. Expected: `PASS`
+      on every step, exit code 0.
+
+      ```sh
+      owlab up --rebuild owrt2512
+      node tools/e2e.mjs --router owrt2512 --old ../tmp/old-apk/luci-theme-footstrap-*.apk \
+        --new dist/noarch/luci-theme-footstrap-[0-9]*.apk
+      ```
+
+   4. Do the same on `owrt2410`:
+
+      ```sh
+      owlab up --rebuild owrt2410
+      node tools/e2e.mjs --router owrt2410 --old ../tmp/old-ipk/luci-theme-footstrap_*_all.ipk \
+        --new dist/all/luci-theme-footstrap_[0-9]*_all.ipk
+      ```
 8. Put the working tree back on the routers: `owlab sync`. e2e leaves the package installed but
    bootstrap active.
-9. In the pull request, say which routers the checks ran on: [CONTRIBUTING.md](../CONTRIBUTING.md).
+9. In the pull request, say which routers the checks ran on, for example
+   `Tested: e2e and anchor green on owrt2512 (25.12/apk) and owrt2410 (24.10/opkg).`
+   See [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Contents
 
@@ -111,7 +136,7 @@ Besides owlab, the checkout needs these tools:
 | `owfeed` | Installed the same way: `go install owfeed.org/owfeed/cmd/owfeed@<OWFEED_VERSION>`. |
 | Node.js, then `npm ci` in the repo root | `tools/`, `npm run changelog` and Playwright. |
 | `npx playwright install chromium` | Fetches the browser `tools/e2e.mjs` drives. |
-| `gh`, signed in | `gh release download` in [verifying.md](verifying.md). |
+| `gh`, signed in | `gh release download` in [run-checks.md](run-checks.md). |
 
 Everything else comes out of `owlab.yaml`.
 
@@ -298,23 +323,17 @@ serves the old one. It looks exactly like an edit that did nothing.
 
 ### What proves what
 
-| Proof | What it proves | What it does not prove |
+Each kind of change has its proof on its own page:
+
+| What changed | Proof | Where |
 |---|---|---|
-| Computed-style diff ([prove-css-change.md](prove-css-change.md)) | A CSS change does what you meant, and nothing else moved. There is no script: drive it with Playwright. | The chrome: the gallery has no `header.ut`, so check the sidebar, bar, rail or menu on a router. |
-| `tools/e2e.mjs` | The package installs, upgrades, removes and reinstalls; every menu page renders with no new JS error or failed request; the shell is intact. | How a page looks. |
-| `tools/anchor-check.mjs` | A poll tick above a parked reader leaves them in place. | How a page looks. |
-| Looking by hand on both routers | A layout, a fold, an axis. | |
+| A template | Compile it with the same `trycompile` LuCI uses. | The command below. |
+| CSS | A computed-style diff, then a look by hand on both routers. | [prove-css-change.md](prove-css-change.md), [The test matrix](#the-test-matrix-pages-and-modes-to-check-by-hand) |
+| The package's life and every menu page | `tools/e2e.mjs` on both routers. | [verifying.md, "What the check proves"](verifying.md#what-the-check-proves) |
+| Scroll anchoring | `tools/anchor-check.mjs` on both routers. | [verifying.md](verifying.md#the-anchoring-check-keeps-a-parked-reader-in-place) |
+| What the checks do not judge: a layout, a fold, an axis | By hand on a synced stand. | [verifying.md](verifying.md#what-the-checks-do-not-judge) |
 
-A CSS change needs the computed-style diff and a look by hand. It also needs a green e2e and anchor
-run on both routers, like every change.
-
-### How to prove each kind of change
-
-| What changed | How to prove it |
-|---|---|
-| A template | Compile it with the same `trycompile` LuCI uses (command below). |
-| CSS | Diff computed styles, each sheet in its own document: [prove-css-change.md](prove-css-change.md). |
-| Behaviour | On a router, with `tools/e2e.mjs` and `tools/anchor-check.mjs` ([Proving it on a router](#proving-it-on-a-router)). By hand on a synced stand for what they do not judge: a layout, a fold, an axis. |
+Every change, a CSS one included, also needs a green e2e and anchor run on both routers.
 
 ```sh
 owlab exec owrt2512 -- 'ucode -T -c -o /dev/null \
@@ -340,7 +359,8 @@ Two checks run on a real router. They are the local form of CI's `e2e` and `anch
 | `tools/e2e.mjs` | The package's life and every menu page. |
 | `tools/anchor-check.mjs` | Scroll anchoring. |
 
-What they prove, how to run them and their exit codes: [verifying.md](verifying.md).
+What they prove: [verifying.md](verifying.md). How to run them and their exit codes:
+[run-checks.md](run-checks.md).
 
 For anything the checks do not judge (a layout change, a fold, an axis), drive the running
 container by hand:

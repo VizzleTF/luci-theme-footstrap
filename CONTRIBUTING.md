@@ -28,7 +28,7 @@ Two checks run on a real OpenWrt router:
 | `tools/e2e.mjs` | Installs the last release and upgrades it to your build. Opens every menu page under footstrap and under bootstrap. Then removes and reinstalls the package. |
 | `tools/anchor-check.mjs` | Checks that a poll tick above a parked reader leaves them in place. |
 
-[`docs/verifying.md`](docs/verifying.md) says what they prove and how to run them.
+[`docs/verifying.md`](docs/verifying.md) says what they prove. [`docs/run-checks.md`](docs/run-checks.md) says how to run them.
 [`docs/development.md`](docs/development.md) sets up the `owlab` routers they run on.
 Fixing a CSS bug: follow [the path](docs/development.md#fixing-a-css-bug-the-path). The two checks do not judge how a page looks; a computed-style diff proves a CSS change.
 
@@ -38,6 +38,9 @@ CI's `e2e` and `anchor` jobs run the checks on both for every pull request that 
 
 Rule: if you cannot run the checks yourself, say so in the pull request.
 Why: an untested change described as tested is worse than an untested one.
+
+Say in the pull request which routers the checks ran on. Example line:
+`Tested: e2e and anchor green on owrt2512 (25.12/apk) and owrt2410 (24.10/opkg).`
 
 ## Keep node out of the package source
 

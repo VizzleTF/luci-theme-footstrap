@@ -124,7 +124,7 @@ removal it removes it. CI's `e2e` checks that a removal leaves nothing under
 6. To try it on a hardware router, run `dev-sync.sh`. It copies `root/` and
    `htdocs/luci-static/resources/` as trees, `htdocs/luci-static/footstrap/*`, and the `.ut` files
    in `themes/footstrap/` and `partials/` only. A file elsewhere does not reach the router this way.
-7. If step 3 or step 5 changed `conffiles`, `postinst` or `postrm`, make the same edit in the
+7. If step 3 changed `conffiles`, or step 5 changed `postrm`, make the same edit in the
    hand-maintained `Makefile` of the openwrt/luci copy. Re-run `tools/sync-luci-fork.sh
    <path-to-luci>` after any change under `styles/`. See
    [The copy in openwrt/luci](#the-copy-in-openwrtluci).

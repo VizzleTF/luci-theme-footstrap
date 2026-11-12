@@ -43,7 +43,7 @@ Find the symptom, then read the rule. The "Whose" column takes one of three valu
 
 | Symptom | Rule | Whose | Fix |
 |---|---|---|---|
-| Leaving an app's page is a full page load, not an SPA navigation | [Rule 2](#rule-2-a-document-holding-an-invasive-sheet-hands-the-next-page-over-by-full-load) and [its DOM extension](#rule-2-extended-to-the-dom-a-document-holding-a-stray-body-node-hands-the-next-page-over-too) | intended | None in the theme. The app can keep SPA by scoping its CSS and removing its `<body>` nodes. To find the trigger, see [How to check](#how-to-check). |
+| Leaving an app's page is a full page load, not an SPA navigation | [Rule 2](#rule-2-a-document-holding-an-invasive-sheet-hands-the-next-page-over-by-full-load) and [its DOM extension](#rule-2-extended-to-the-dom-a-document-holding-a-stray-body-node-hands-the-next-page-over-too) | intended | None in the theme. The app can keep SPA by scoping its CSS and removing its `<body>` nodes. To find the trigger, see [Find what forced a full load](#find-what-forced-a-full-load). |
 | An editor (ACE, CodeMirror) loses its styles after SPA away and back | [Rule 1](#rule-1-view-css-is-never-deleted) | theme | Something deleted a view sheet. Stop deleting it. |
 | Stock Save/Apply/Reset vanish on other pages after File Manager | [Rule 2](#rule-2-a-document-holding-an-invasive-sheet-hands-the-next-page-over-by-full-load) | theme | The invasive-sheet test missed the sheet. Fix `invasiveSheet()` in `fs-sheets.js`. |
 | `<style>` elements in `<head>` grow with every visit | [Rule 3](#rule-3-the-only-safe-deletion-is-a-byte-identical-duplicate) | theme | Fix `dedupeViewSheets()`. |
@@ -392,7 +392,8 @@ before you navigate away.
    L.require('fs-sheets').then((s) => console.log(s.documentPoisoned()))
    ```
 
-   Expected: `true` means an invasive sheet holds the document (Rule 2).
+   Expected: `true` means an invasive sheet holds the document (Rule 2). `false` does not clear
+   the page: a stray `<body>` node can still force the full load, so go on to step 3.
 2. Find the sheet. In the Elements panel, look in `<head>` for a `<style>` or a
    `<link rel="stylesheet">` without `data-fs-shell`. Test its selectors against
    [Rule 2's three tests](#rule-2-a-document-holding-an-invasive-sheet-hands-the-next-page-over-by-full-load).

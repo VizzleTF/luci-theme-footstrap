@@ -238,10 +238,8 @@ The allow-list lives once, in the file's `INFRA`.
 | `Upstream outage (safe to rerun)` | `tools/ci-retry.sh`, giving up on a stall or on an exit `CI_RETRY_ON` names (above); `tools/e2e.mjs`, on the first attempt only, when every failed step is one where the stand did not answer; `tools/anchor-check.mjs`, on its exit 3; `playground`'s step, when the recording on a fresh router exits 75 too |
 | `The router did not come up (infrastructure, not the theme)` | `tools/ci-stand.sh`, after three failed `owlab up` attempts |
 
-`e2e.mjs` annotates a step the stand failed at the run's end, once it is known whether anything else
-failed ([verifying.md](verifying.md) "Reading a run"). It prints the outage title only when every
-failed step is such a one, and only on attempt 1. One finding beside them, or a second attempt, gives
-each its own step's title instead.
+When `e2e.mjs` prints the outage title, and when it gives each step its own title instead:
+[verifying.md](verifying.md) "One outage annotation, or one title per step".
 
 After a first 2 or 3, `anchor` names an exit of the check on the fresh router other than 0 and 3 as
 `Scroll anchoring on <router>` (below). A first 3 and a green second measurement leave the outage
@@ -414,8 +412,8 @@ A built ipk proves nothing about the ipk; this job does.
 
 Both legs run because the templates are identical but the ucode interpreters are not.
 
-Screenshots (one per page and width) and `report.json` are uploaded as artifact `e2e-<router>`, also
-on a red run.
+The job uploads its artifact `e2e-<router>`, also on a red run. What it holds:
+[verifying.md](verifying.md) "Reading a run".
 
 ## `anchor`: scroll anchoring on a real router
 
@@ -428,9 +426,9 @@ every stand has.
 It is not `owlab install`. Why: under owlab 0.6.7 that refreshes every feed and installs again when a
 dependency is missing. A feed outage would then stand between the job and its verdict.
 
-One poll tick grows Status > Overview above a parked reader, and one shrinks it back. Each must leave
-the reader where bootstrap does, in Chromium, Firefox and WebKit ([verifying.md](verifying.md) "What
-the check proves"). Its log is uploaded as artifact `anchor-<router>`.
+What the check measures and when it passes: [verifying.md](verifying.md) "The anchoring check keeps
+a parked reader in place". Its log is uploaded as artifact `anchor-<router>`, described in
+[verifying.md](verifying.md) "Reading a run".
 
 ### Exit 2 or 3 gets one more measurement on a fresh router
 
@@ -532,7 +530,7 @@ Each cache is saved right after the step that fills it. So a run that goes red l
 what it downloaded.
 
 A red leg also saves `tools/ci-stand-state.sh`'s snapshot of the router as `stand.txt` in its
-artifact.
+artifact ([verifying.md](verifying.md) "Reading a run" lists what it holds).
 
 ### A docs-only change skips the steps, not the job
 

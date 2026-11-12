@@ -75,7 +75,12 @@ click, which opens at the top anyway.
 | 3 | the entry was evicted | more than 50 entries saved since you left that page (`SCROLL_MEM_MAX`); the page opens at the top | expected |
 | 4 | the replay was cancelled by the reader | you scrolled, or pressed a scroll key, before the page reached its height | expected |
 | 5 | the replay gave up | the incoming page did not reach the saved height within 5 s | expected |
-| 6 | none of the above | an SPA Back or Forward onto a saved entry, with no input, on a page that reaches its height in time | bug |
+| 6 | the wrong element scrolls, or the page cannot scroll | `<html data-layout>` names the layout: `sidebar` scrolls `#maincontent`, `top` scrolls the document | expected per layout; a bug if the named element does not scroll |
+| 7 | none of the above | an SPA Back or Forward onto a saved entry, with no input, on a page that reaches its height in time | bug |
+
+For a bug in row 7, look at `saveScroll()`, `restoreScroll()` and the `popstate` handler that sets
+`_pendingRestore` in `fs-router.js`. Report the URL, the layout (`data-layout`), the browser, and
+whether you used Back, Forward or a click.
 
 ## Where the code lives
 

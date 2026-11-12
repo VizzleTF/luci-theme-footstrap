@@ -12,8 +12,9 @@ Client navigation: [spa-router.md](spa-router.md).
 1. Layout is a client axis, `:root[data-layout]` = `sidebar` | `top`, not a theme entry.
 2. Every layout rule matches positively. Never write `:not([data-layout="top"])`.
 3. The bar is the base, written once and unguarded. The vertical sidebar is the exception, and it
-   wins on specificity (`0,4,0` against the bar's `0,1,0`), never on source order. A bar rule
-   loses to a vertical-sidebar rule on the same property, wherever it sits in the file.
+   wins on specificity, never on source order: its `:root[data-sb]` prefix adds `0,2,0` to each bar
+   selector (`.fs-sidebar` `0,1,0` -> `0,3,0`; `.fs-sidebar ul.nav > li > a` `0,2,3` -> `0,4,3`).
+   A bar rule loses to a vertical-sidebar rule on the same property, wherever it sits in the file.
 4. Whether the sidebar becomes a bar is a measurement (`data-narrow`), not a viewport breakpoint.
 5. `fs-chrome.js` is the only renderer. The top layout is its flyout mode at desktop width.
 6. Dark mode stamps three attributes. The theme's CSS reads only `data-darkmode`.
@@ -279,8 +280,13 @@ The bar lives in `styles/theme/20-shell.css`. CSS cannot OR a media query with
 twice.
 
 With the bar unguarded, each of the three chrome states (bar, vertical sidebar, vertical rail) is
-stated exactly once. The vertical sidebar wins on specificity (`0,4,0` against the bar's `0,1,0`),
-never on source order.
+stated exactly once. The vertical sidebar wins on specificity, never on source order. Its
+`:root[data-sb]` prefix adds `0,2,0` to each bar selector:
+
+| Element | Bar | Vertical sidebar |
+|---|---|---|
+| the chrome box | `.fs-sidebar`: `0,1,0` | `:root[data-sb] .fs-sidebar`: `0,3,0` |
+| a menu item | `.fs-sidebar ul.nav > li > a`: `0,2,3` | `:root[data-sb] .fs-sidebar ul.nav > li > a`: `0,4,3` |
 
 ### `.fs-shell`'s floor height is `svh`, never `dvh`
 

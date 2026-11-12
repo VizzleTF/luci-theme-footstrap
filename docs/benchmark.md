@@ -12,6 +12,14 @@ and against a third-party theme.
 
 Script: `bench/nav-benchmark.py`. It runs against any OpenWrt 25.12+ router.
 
+## Contents
+
+- [It measures the time from a click to a fully rendered view](#it-measures-the-time-from-a-click-to-a-fully-rendered-view)
+- [CPU is measured at both ends, because "load" is two questions](#cpu-is-measured-at-both-ends-because-load-is-two-questions)
+- [Footstrap comes out ahead because it keeps the shell between clicks](#footstrap-comes-out-ahead-because-it-keeps-the-shell-between-clicks)
+- [Running it yourself](#running-it-yourself)
+- [Results](#results)
+
 ## It measures the time from a click to a fully rendered view
 
 For every page, it takes wall-clock milliseconds from "I want to go there" to "the view is fully

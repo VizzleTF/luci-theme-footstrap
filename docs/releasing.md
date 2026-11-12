@@ -13,19 +13,19 @@ steps are numbered, 0 to 7.
 
 During development:
 
-1. Write every change a theme user sees into `[Unreleased]`, in the same commit as the code, in both
-   changelog files ([The changelog contract](#the-changelog-contract)).
+- Write every change a theme user sees into `[Unreleased]`, in the same commit as the code, in both
+  changelog files ([The changelog contract](#the-changelog-contract)).
 
 When cutting a release:
 
-2. Check A: scope the diff. It decides which live checks are mandatory.
-3. Check B: read CI's push run on `main` job by job, run `npm run changelog` and `owfeed lock`, and
-   review the diff for security.
-4. Check C: check asset selection, issue #6, on every release.
-5. Check D: look at the touched areas live on both routers.
-6. Runbook steps 1 to 6: rename `[Unreleased]`, commit, push, then tag that commit. Read the tag's
-   run job by job.
-7. Runbook step 7: dispatch the feed update yourself and read the served index.
+- Check A: scope the diff. It decides which live checks are mandatory.
+- Check B: read CI's push run on `main` job by job, run `npm run changelog` and `owfeed lock`, and
+  review the diff for security.
+- Check C: check asset selection, issue #6, on every release.
+- Check D: look at the touched areas live on both routers.
+- Runbook steps 1 to 6: rename `[Unreleased]`, commit, push, then tag that commit. Read the tag's
+  run job by job.
+- Runbook step 7: dispatch the feed update yourself and read the served index.
 
 ## Contents
 
@@ -57,6 +57,7 @@ Why: a bug with no check comes back silently.
 | `<DATE>` | the day you make the release commit, `YYYY-MM-DD` | `date +%F` |
 | `<ID>` | a run id, from the `ID` column of `gh run list` | |
 | `<SHA>` | a commit sha | |
+| `<arch>` | a router's package architecture: `/etc/apk/arch` on 25.12, `DISTRIB_ARCH` on 24.10; this repo keeps no list of the feed's architectures | |
 
 Scratch output goes to `../tmp/release-<VERSION>/`.
 
@@ -202,25 +203,33 @@ It must find exactly one asset per format. A `.sig` ends in `.EXT.sig` and does 
 
 Simulate it by hand on the release's shape:
 
-1. Take the asset list of the last published release:
+1. Create the scratch directory:
+
+   ```sh
+   mkdir -p ../tmp/release-<VERSION>
+   ```
+
+2. Take the asset list of the last published release:
 
    ```sh
    gh api repos/VizzleTF/luci-theme-footstrap/releases/latest \
      --jq '.assets[].browser_download_url' > ../tmp/release-<VERSION>/urls.txt
    ```
 
-2. If this release adds or renames an asset, edit `../tmp/release-<VERSION>/urls.txt` to match: one URL per line.
-3. Count the matches per format:
+3. If this release adds or renames an asset, edit `../tmp/release-<VERSION>/urls.txt` to match: one URL per line.
+4. Count the matches per format:
 
    ```sh
    for EXT in apk ipk; do
      n=$(grep -Ec "/luci-theme-footstrap[-_][^/]*\.$EXT\$" ../tmp/release-<VERSION>/urls.txt)
-     echo "$EXT -> n=$n (must be 0 or 1)"
+     echo "$EXT -> n=$n (must be 1)"
    done
    ```
 
-   Expected: `n=0` or `n=1` for each of `apk` and `ipk`. A higher `n` means a field reader would
-   pick the wrong package: rename the asset before you tag.
+   Expected: `apk -> n=1` and `ipk -> n=1`. Every release ships the theme in both formats
+   ([ci.md](ci.md) "What the release carries"). `n=0` means a format is missing, and a reader of
+   that format finds nothing. A higher `n` means a field reader would pick the wrong package:
+   rename the asset before you tag.
 
 ## Check D. Live checks for the areas the diff touched
 
@@ -235,6 +244,18 @@ Compare against stock bootstrap wherever you are unsure: it is the reference for
 
 Expected: every row you check shows what its "What to look at" cell describes.
 
+Which rows a path in the diff makes mandatory. The repo maps only these paths to rows: the issue
+numbers come from comments in the code. Any other path in the Check A list: check every row.
+
+| Path in the diff | Rows |
+|---|---|
+| `styles/` | the visual rows: #1, #5, #7, #9, #10, #11 (`styles/` comments cite #5, #7, #9, #10) |
+| `fs-select.js` | #2, any `<select>` |
+| `fs-fit.js` | #1 (the stacked table), #41/#75 (the `min-height` floors), scroll creep |
+| `menu-footstrap.js`, `*.ut`, `fs-sheets.js` | every row |
+
+The rows for #3, #4, #5 and #8 come from the issue reports.
+
 | Issue | Page | What to look at |
 |---|---|---|
 | #1 | a third-party app with a wide table, firewall zones | the table stacks into cards, does not overflow its section; the content width does not tear |
@@ -245,6 +266,10 @@ Expected: every row you check shows what its "What to look at" cell describes.
 | #41, #75 | `admin/network/network`, `admin/system/startup` (a page with a tab strip) | switch tabs: the pane the reader LEFT keeps no `min-height`, and the tab they opened starts where the page starts. The fault is invisible on a page that is only loaded. On a page that does not poll, it never goes away by itself |
 | scroll creep | `admin/status/overview` on a narrow window, scrolled off the top, in Safari | pass: the page stays where you scrolled it across several poll ticks; fail: it creeps upward once per poll tick |
 | #11 | `admin/status/overview` (client list) | the "Network" column is not crushed, rows are not over-wide |
+| #3 | `luci-app-filemanager` (on the stands) | the file manager opens and works; after you leave it, a config page still shows Save, Apply and Reset |
+| #4 | System → Appearance, the login and page background | choosing and uploading a background works and shows after a reload |
+| #5 | `admin/system/attendedsysupgrade/configuration`; `admin/status/overview` (port and network cards, client list) | the "Address" field is wide enough for a URL; the cards match the README screenshots; a MAC address stays on one line |
+| #8 | OpenClash (`luci-app-openclash`, in `owlab.yaml`'s third-party apps) | the theme's styles apply on the OpenClash page |
 | #17 | the release assets, not a page | `manifest.txt` and `manifest.txt.sig` are present; `latest/download/manifest.txt` serves that file; `usign -V` passes with `release.pub`; `awk '$1=="pkg"'` yields one line per format; no install or update path touches `api.github.com` |
 
 The #17 row guards installs as well as readers. A router the feed cannot serve is installed from the
@@ -416,7 +441,8 @@ Any red stops here, with its owner named.
 ### 1. Rename `[Unreleased]`
 
 Rename `[Unreleased]` to `## [<VERSION>] — <DATE>` in both `CHANGELOG.md` and `CHANGELOG_ru.md`.
-Add the `compare/` link at the bottom of each, above the previous version's link.
+Add the `compare/` link at the bottom of each, above the previous version's link. There is no
+`[Unreleased]` compare link to update: the changelog dropped it in commit 161a053.
 
 The format, from the 0.14.20 release:
 
@@ -446,6 +472,7 @@ Commit that change as `release: <VERSION>` and push it to `origin main`. The ord
 fixed: push the release commit, read its run (step 4), then tag (step 5).
 
 ```sh
+git add CHANGELOG.md CHANGELOG_ru.md && git commit -m "release: <VERSION>"
 git push origin main
 ```
 
@@ -461,6 +488,25 @@ gh run list --branch main --workflow build.yml --event push -L2
 
 Expected: two rows. The top one is the release commit's run, the second the run before it. Take each
 `<ID>` from the `ID` column for `gh run view <ID>`.
+
+1. Check that the top row is the release commit. Its title is `release: <VERSION>`; for the sha,
+   compare with:
+
+   ```sh
+   git rev-parse HEAD
+   gh run view <ID> --json headSha --jq .headSha
+   ```
+
+   Expected: the same sha twice.
+
+2. Wait for the release commit's run to finish:
+
+   ```sh
+   gh run watch <ID> --exit-status
+   ```
+
+   Pass: the run's conclusion is `success`, and `gh run watch` exits 0. Read it job by job with
+   `gh run view <ID>`.
 
 - It lists Build's push runs only. A CodeQL or pages run is not the pipeline the tag waits on.
 - It has no `--status completed`, so the release sha's own run shows while it is still going.
@@ -560,6 +606,11 @@ gh release view v<VERSION>
 The notes fill the release page; they are not an asset and carry no `.sig` ([ci.md](ci.md)). Beside
 the assets sits `playground.tar.gz`, which `release` attaches unsigned while the release is a draft.
 
+Nobody publishes the release by hand. The `release` job runs owfeed's `package.yml`: it creates the
+release as a draft, attaches the assets, and publishes it before the job ends. `pages` then mirrors
+it as the latest release. Step 7 starts once `release` is green and `gh release view v<VERSION>`
+shows the release without the draft mark.
+
 ### 7. Publish the feed; do not wait on the schedule
 
 The theme is installed from owfeed-packages. A release nobody can `apk upgrade` into is half a
@@ -607,7 +658,10 @@ The next scheduled run can be hours away. So dispatch it yourself:
 
    Expected: each run ends in `success`.
 
-4. Read the served index, not the workflow log, and confirm the new version is there:
+4. Read the served index, not the workflow log, and confirm the new version is there. `<arch>` is
+   a router's package architecture: `/etc/apk/arch` on 25.12, `DISTRIB_ARCH` in
+   `/etc/openwrt_release` on 24.10. Expected: `<VERSION>-r1`, the `-r1` that `PKG_RELEASE:=1` puts
+   on every package.
    - 24.10: `Packages.gz` on `https://repo.owfeed.org/releases/24.10/<arch>/`. Look for `Version:`
      after `Package: luci-theme-footstrap`.
    - 25.12: `apk adbdump` on `releases/25.12/<arch>/packages.adb`, from a router or stand. The file

@@ -69,6 +69,7 @@ inside that node, as `luci-app-smartdns` does:
 
 ```js
 return m.render().then(node => {
+    node.classList.add('myapp-root');   // the root for your names and container queries
     node.prepend(E('style', [ css ]));
     return node;
 });
@@ -496,7 +497,9 @@ Why: it races the theme's router, and both navigate. istore does this.
 
 ### P-5. Hide stock buttons through the view, not CSS
 
-The rule: you MUST set `handleSave`, `handleSaveApply` and `handleReset` to `null`.
+The rule: when your view must not show a stock button, you MUST set its handler to `null`:
+`handleSave`, `handleSaveApply`, `handleReset`. A `null` handler removes the button, so keep the
+ones your form needs to save.
 
 Why: this is the supported way. It needs no `!important` and does not leak onto the next page.
 `luci-app-partexp` and `luci-app-ttyd` do this.
@@ -533,8 +536,7 @@ Tick every line before you publish:
       never from `prefers-color-scheme`.
 - [ ] W-1: the editor theme follows the page's mode.
 - [ ] L-1: layout follows the container, not the viewport.
-- [ ] P-5: `handleSave`, `handleSaveApply` and `handleReset` set to `null` instead of hiding stock
-      buttons with CSS.
+- [ ] P-5: a stock button you do not want is removed by a `null` handler, never hidden with CSS.
 - [ ] P-1, P-3, P-4, W-4: no `window.onload`, no leftovers on `body`, no `popstate` handler, no
       `z-index: 2147483647`.
 

@@ -27,7 +27,7 @@ To install it, run one command on the router: see [Install in one command](#inst
 | OpenWrt 25.12 or newer (package manager `apk`) | The latest version |
 | OpenWrt 24.10.3 or newer (package manager `opkg`) | The latest version |
 | OpenWrt 24.10.0 to 24.10.2 | Nothing: these releases lack a LuCI widget the theme uses. Upgrade OpenWrt first. |
-| OpenWrt 23.05 | Version 0.14.2, the last one that runs there. Later versions use a LuCI widget that 23.05 lacks. |
+| OpenWrt 23.05 | Version 0.14.2, the last one that runs there. The same install command picks it. Later versions use a LuCI widget that 23.05 lacks. |
 
 The browser must be Chrome 120, Firefox 121, Safari 17.2 or newer.
 

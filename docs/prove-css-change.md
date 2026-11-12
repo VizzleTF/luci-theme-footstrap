@@ -8,6 +8,7 @@ The tree, layers and build: [css.md](css.md). The whole contributor path:
 
 ## Contents
 
+- [Where the old CSS comes from](#where-the-old-css-comes-from)
 - [Over the gallery](#over-the-gallery)
 - [On a router: the chrome and page-scoped rules](#on-a-router-the-chrome-and-page-scoped-rules)
 
@@ -20,8 +21,31 @@ between two runs of the same sheet than a real regression does.
 The gallery has no `header.ut` chrome, so check a change to the sidebar, bar, rail or menu on a
 router: [On a router: the chrome and page-scoped rules](#on-a-router-the-chrome-and-page-scoped-rules).
 
-There is no script for this in the repo; drive it with Playwright, which is in `node_modules`. Run
-every command from the repo root: it holds the package folder `luci-theme-footstrap/` and `docs/`.
+The repo ships no script for this. Step 3 of the gallery recipe gives one, `computed-diff.mjs`,
+which drives Playwright from `node_modules`; both recipes use it. Run every command from the repo
+root: it holds the package folder `luci-theme-footstrap/` and `docs/`.
+
+Scratch directories: any empty directory outside the source tree works. `/tmp/fs-*` below is an
+example.
+
+## Where the old CSS comes from
+
+Both recipes compare the old CSS (A) with the new (B). Pick the source of A by where your change is:
+
+| Your change | Take A from |
+|---|---|
+| uncommitted | `HEAD`: `git archive HEAD` (gallery) or `git stash` (router) |
+| committed | the parent commit: `git archive HEAD~1` (gallery), or `git checkout HEAD~1 -- luci-theme-footstrap/styles` before the router's A sync and `git checkout HEAD -- luci-theme-footstrap/styles` after it |
+
+If A is taken from the wrong place, A = B and the diff is silently empty. Check that the two
+sources differ before you snapshot:
+
+```sh
+git diff --stat HEAD -- luci-theme-footstrap/styles      # uncommitted change
+git diff --stat HEAD~1 HEAD -- luci-theme-footstrap/styles   # committed change
+```
+
+Expected: at least one `styles/` file listed. An empty output means A = B.
 
 ## Over the gallery
 
@@ -33,7 +57,7 @@ every command from the repo root: it holds the package folder `luci-theme-footst
 
    ```sh
    mkdir -p /tmp/fs-a/js /tmp/fs-b/js /tmp/fs-base
-   git archive HEAD luci-theme-footstrap | tar -x -C /tmp/fs-base
+   git archive HEAD luci-theme-footstrap | tar -x -C /tmp/fs-base    # HEAD~1 if the change is committed
    /tmp/fs-base/luci-theme-footstrap/build-css.sh /tmp/fs-a/cascade.css
    luci-theme-footstrap/mangle-tokens.sh /tmp/fs-a/cascade.css /tmp/fs-a/js
    luci-theme-footstrap/build-css.sh /tmp/fs-b/cascade.css
@@ -126,7 +150,7 @@ every command from the repo root: it holds the package folder `luci-theme-footst
 
    Expected: each `snap` prints `<N> box(es) -> <FILE>`. The control `diff` prints
    `0 difference(s)`, or only `transform` lines on a `::before` that is mid-animation (a spinner).
-   That is this page's noise.
+   That is the gallery's noise.
 
 5. Run the real pass.
 
@@ -137,7 +161,13 @@ every command from the repo root: it holds the package folder `luci-theme-footst
    Expected: one line per changed property, as `<INDEX> <TAG> <PROPERTY>: <A> -> <B>`, then the
    count. The change passes when every line beyond the control pass's noise is one you meant.
 
-6. Delete `computed-diff.mjs` before you commit.
+6. Clean up when both recipes are done: `rm computed-diff.mjs`.
+
+   ```sh
+   git status --short computed-diff.mjs
+   ```
+
+   Expected: no output. The script must not reach a commit.
 
 ## On a router: the chrome and page-scoped rules
 
@@ -147,7 +177,9 @@ with the empty password the dev stand uses, opens the page, and waits for `#topm
 stand and its ports: [development.md](development.md#the-dev-stand-runs-real-openwrt-routers-from-owlabyaml)
 (`owrt2512` answers on `http://localhost:8025`).
 
-1. Put the old CSS on the router: `git stash`, then `owlab sync owrt2512`.
+1. Put the old CSS on the router: `git stash`, then `owlab sync owrt2512`. For a committed change,
+   use the `HEAD~1` checkout from [Where the old CSS comes from](#where-the-old-css-comes-from)
+   instead of `git stash`.
 2. Snapshot the chrome twice, at the width where the change shows. The fifth argument is the
    viewport width; 1280 draws the sidebar, a phone width draws the bar.
 
@@ -157,9 +189,16 @@ stand and its ports: [development.md](development.md#the-dev-stand-runs-real-ope
    node computed-diff.mjs diff /tmp/r-a.json /tmp/r-a2.json
    ```
 
-   Expected: `<N> box(es) -> <FILE>` per snap, and `0 difference(s)` from the control `diff`.
+   Expected: `<N> box(es) -> <FILE>` per snap. The control `diff` result depends on the page:
 
-3. Put the new CSS on the router: `git stash pop`, then `owlab sync owrt2512`.
+   | Page and selector | Control result |
+   |---|---|
+   | a page that does not poll, chrome selector (`.fs-sidebar, .fs-sidebar *`) | `0 difference(s)` |
+   | a polling page (`admin/status/overview`), whole view (`#view, #view *`) | never 0: poll ticks rewrite values, so `content` and `width` lines differ (19 on one stand) |
+   | a polling page, a narrow selector under `#view` | often 0; anything left is noise |
+
+3. Put the new CSS on the router: `git stash pop`, then `owlab sync owrt2512`. For a committed
+   change, `git checkout HEAD -- luci-theme-footstrap/styles` instead of `git stash pop`.
 4. Snapshot again and diff.
 
    ```sh
@@ -170,11 +209,31 @@ stand and its ports: [development.md](development.md#the-dev-stand-runs-real-ope
    Expected: only the properties you meant to change, on the elements you meant. For a page-scoped
    rule, use that page's URL and a selector under `#view`.
 
-5. Delete `computed-diff.mjs` before you commit.
+To separate noise from the change on a polling page:
+
+1. Narrow the selector to the boxes the rule targets, under `#view`.
+2. Compare the control's lines (`r-a` against `r-a2`) with the real pass's lines (`r-a` against
+   `r-b`).
+3. A line in both lists is noise. A line only in the real pass is the change.
+
+Example for the Overview port tiles:
+
+```sh
+node computed-diff.mjs snap http://localhost:8025/cgi-bin/luci/admin/status/overview /tmp/o-a.json '#view .ifacebox, #view .ifacebox *' 1280
+node computed-diff.mjs snap http://localhost:8025/cgi-bin/luci/admin/status/overview /tmp/o-a2.json '#view .ifacebox, #view .ifacebox *' 1280
+node computed-diff.mjs diff /tmp/o-a.json /tmp/o-a2.json > /tmp/o-control.txt
+# sync the new CSS (step 3), then:
+node computed-diff.mjs snap http://localhost:8025/cgi-bin/luci/admin/status/overview /tmp/o-b.json '#view .ifacebox, #view .ifacebox *' 1280
+node computed-diff.mjs diff /tmp/o-a.json /tmp/o-b.json > /tmp/o-real.txt
+grep -vxFf /tmp/o-control.txt /tmp/o-real.txt
+```
+
+Expected: the last command prints only the lines your change caused, plus the real pass's
+`<N> difference(s)` count line.
 
 Two traps:
 
 - Web fonts. A machine with Manrope or JetBrains Mono installed still resolves them. A snapshot
   taken before font matching settles measures fallback metrics. Wait for `document.fonts.ready`.
 - `admin/status/overview` polls and redraws, so it differs even with identical CSS. Run a control
-  pass (A = B) to learn each page's noise.
+  pass (A = B) to learn each page's noise, as in the Overview example above.

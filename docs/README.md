@@ -18,7 +18,7 @@ Installing and using the theme is in the [repository README](../README.md).
 | find why a page lost its scroll position | [spa-router.md, "Scroll lost? Check in this order"](spa-router.md#scroll-lost-check-in-this-order) |
 | add a file to the package | [package.md, "Adding a file"](package.md#adding-a-file) |
 | check my patch before review | [conventions.md, "Before review"](conventions.md#before-review) |
-| run e2e and anchor-check on the dev routers | [verifying.md, "Run e2e on both routers"](verifying.md#run-e2e-on-both-routers) |
+| run e2e and anchor-check on the dev routers | [run-checks.md, "Run e2e on both routers"](run-checks.md#run-e2e-on-both-routers) |
 | understand a red CI run | [verifying.md, "Reading a run"](verifying.md#reading-a-run), then [ci.md](ci.md) |
 | fix a dev stand that shows no theme, a 403, a 502 or a stale package | [stand-traps.md](stand-traps.md) |
 | cut a release | [releasing.md](releasing.md) |
@@ -34,7 +34,8 @@ The tables below list every page by area.
 | [conventions.md](conventions.md) | The rules a patch must follow, and why |
 | [development.md](development.md) | Bring up a dev router, push a change, prove it works |
 | [stand-traps.md](stand-traps.md) | Troubleshooting the dev stand: symptoms that make a measurement lie |
-| [verifying.md](verifying.md) | The router checks (`tools/e2e.mjs`, `tools/anchor-check.mjs`): what they prove, running them, reading their CI artifacts |
+| [verifying.md](verifying.md) | The router checks (`tools/e2e.mjs`, `tools/anchor-check.mjs`): what they prove, reading their CI artifacts |
+| [run-checks.md](run-checks.md) | Running the router checks locally: commands, exit codes, expected output |
 
 ## How it is built
 
