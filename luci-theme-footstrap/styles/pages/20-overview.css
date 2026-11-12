@@ -182,7 +182,7 @@
 	}
 
 	/* narrow card: the value takes its own line, the reserve above cannot fit it — docs/css.md
-	 * above has the 218px/190px measurement. */
+	 * above has the 258px reserve and the 35rem (560px) threshold. */
 	@container fs-view (max-width: 35rem) {
 		:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .tr:has(.cbi-progressbar) .td:first-child {
 			padding-inline-end: 0;

@@ -1,307 +1,548 @@
 # Styling a LuCI app so it works under any theme
 
+Rules for authors of `luci-app-*` packages. They hold for every LuCI theme; footstrap-specific
+behaviour is marked as such.
+
 *Русская версия: [luci-app-styling-guide_ru.md](luci-app-styling-guide_ru.md).*
 
-This guide is for authors of `luci-app-*` packages, and its advice holds for any theme. Every
-rule below comes from a pattern found in a real, popular app. Every one of them is a bug on *some*
-theme, usually one the author never tested against. Where footstrap does something specific, the
-guide says so.
+Every rule comes from a real bug in a popular app. Each bug shows only on a theme the author did
+not test. What these apps do to a shared page is in [third-party-apps.md](third-party-apps.md).
 
-What these apps do to a shared document is collected in [third-party-apps.md](third-party-apps.md).
+MUST and MUST NOT mark a rule that breaks pages when ignored. SHOULD marks a strong
+recommendation; an exception needs a reason.
+
+## The short version
+
+If you read nothing else, follow these seven rules:
+
+1. Return your `<style>` inside the view tree. Never append it to `<head>`.
+2. Prefix every class, id and custom property with your app name.
+3. Take every colour from the 26 export names (`--*-color-*` and `--on-*-color`), with a literal
+   fallback.
+4. Put text on a coloured fill in the matching `--on-*-color`.
+5. Read dark mode from the theme. Never use `prefers-color-scheme`.
+6. Size layout by your container. Never by the viewport.
+7. Do work in `render()`. Never in `window.onload`.
+
+The [checklist](#checklist) at the end covers every rule.
+
+## Contents
+
+- [S. Where your CSS lives](#s-where-your-css-lives)
+- [N. Names](#n-names)
+- [C. Colour](#c-colour)
+- [The export tier: 26 names](#the-export-tier-26-names)
+- [D. Dark mode](#d-dark-mode)
+- [W. Editors and heavy widgets](#w-editors-and-heavy-widgets)
+- [L. Layout](#l-layout)
+- [P. Page lifetime](#p-page-lifetime)
+- [Checklist](#checklist)
+- [Apps to copy from](#apps-to-copy-from)
 
 ---
 
-## 1. CSS lifetime: where you put a `<style>` decides who else it hits
+## S. Where your CSS lives
 
-A LuCI view is rendered client-side and swapped in and out of `#view`. A modern theme may be an
-SPA: it never reloads the document. So the question "when does my CSS die?" has three different
-answers, and only one of them is safe.
+A LuCI view is rendered in the browser and swapped in and out of `#view`. A modern theme can be an
+SPA: it never reloads the page between clicks. So the place of your `<style>` decides how long it
+lives and which pages it hits.
 
-**DO — put the `<style>` in the tree you return.** It dies with your view, exactly like the rest
-of your markup. Stock LuCI does this in `package-manager.js`, `nftables.js`, `aria2/log.js`.
+### S-1. Your `<style>` MUST be inside the tree your view returns
+
+Why: it then dies with your view, like the rest of your markup.
 
 ```js
+// Bad: stays in <head> for the whole session
+document.head.appendChild(E('style', [ css ]));
+
+// Good: lives exactly as long as the view
 return E([], [
-    E('style', [ css ]),           // scoped to this view's lifetime by construction
+    E('style', [ css ]),
     E('div', { 'class': 'myapp-root' }, …)
 ]);
 ```
 
-**DON'T — `document.head.appendChild(style)`.** On a full page load it looks harmless, because the
-document is thrown away on the next click. Under an SPA theme it stays forever and restyles every
-page the user visits afterwards. `luci-app-filemanager` hides the stock Save/Apply/Reset buttons
-this way (`.cbi-button-save { display: none !important }`) and every config page in the session
-becomes unsavable. `luci-app-banip` and `luci-app-adblock` do it with a `<link>`.
+Stock LuCI does this in `package-manager.js`, `nftables.js` and `aria2/log.js`.
 
-**DON'T — inject at module eval.** A `<style>` added at the top level of your module is created
-**once per document**. The same holds for one added by a library you load, as ACE does with its
-14 KB `ace_editor.css`. Your module is cached, so the sheet can never be re-created. A theme that
-cleans up after you cannot give it back, and your widget renders structureless. If you must inject
-this way, be idempotent and expect your sheet to stay for the life of the page.
+A view built on `form.Map` returns `m.render()`, a promise of the map's node. Put the `<style>`
+inside that node, as `luci-app-smartdns` does:
 
-**How footstrap reacts** (so you can predict it). Nothing is ever deleted. footstrap leaves a sheet
-in `<head>` alone, and SPA navigation keeps working, as long as the sheet cannot paint a page that
-is not yours:
+```js
+return m.render().then(node => {
+    node.prepend(E('style', [ css ]));
+    return node;
+});
+```
 
-* it names only your own classes (`.ace_*`, `.hexview`, `.myapp-card`), or
-* it names a stock widget but *pins* the rule to your markup with a name of your own.
-  `#cbi-myapp-section > .cbi-section-remove` and `.myapp-table th.sortable.active` are both fine:
-  without your section, or your table, they match nothing. (A `:not()` argument does not
-  count as a pin: `.cbi-button-save:not(.my-save-button)` still matches every stock save button on
-  every page.) Or
-* it is a bare selector that declares nothing but your own custom properties —
-  `:root { --myapp-accent: … }` is inert; `:root { color-scheme: light dark }` is not.
+What goes wrong otherwise: a sheet in `<head>` looks harmless on a full page load, because the next
+click throws the page away. Under an SPA theme it stays and restyles every page the user opens next.
 
-Any other sheet makes the document unusable for the SPA, and the next navigation falls back to a
-full page load. Examples: `.cbi-button-save { display: none }`, `.error { … }`, `h4 { … }`,
-`div > label + select { … }`, `svg text { … }`. Your app still works; the user pays one ordinary page
-load. All five of those examples are real, from apps in the top 30 by stars.
+- `luci-app-filemanager` hides the stock Save, Apply and Reset buttons this way
+  (`.cbi-button-save { display: none !important }`). Every config page in the session loses them.
+- `luci-app-banip` and `luci-app-adblock` do the same with a `<link>`.
+
+### S-2. You SHOULD NOT inject CSS when your module loads
+
+Why: a `<style>` added at the top level of a module is created once per page. The module is cached,
+so the sheet can never be created again. A theme that cleans it up cannot give it back, and your
+widget loses its styles.
+
+The same happens with a library that injects its own CSS. ACE does this with its 14 KB
+`ace_editor.css`.
+
+S-2 is a last resort; use S-1 whenever you can. If you must inject this way: make the injection idempotent, and expect the sheet to stay for the
+life of the page.
+
+### What footstrap does with a sheet in `<head>`
+
+This part is footstrap-only background. S-1 is all you need to act on.
+
+footstrap never deletes a sheet. It keeps SPA navigation on while the sheet can paint only your own
+page. A sheet is safe when every selector in it does one of these:
+
+- It names only your own classes: `.ace_*`, `.hexview`, `.myapp-card`.
+- It names a stock widget, pinned to a name of your own:
+  `#cbi-myapp-section > .cbi-section-remove`, `.myapp-table th.sortable.active`.
+  Without your section or table, these match nothing.
+- It is a bare selector that declares only your own custom properties:
+  `:root { --myapp-accent: … }`.
+
+These do not count as safe:
+
+- A `:not()` argument is not a pin. `.cbi-button-save:not(.my-save-button)` still matches every
+  stock Save button on every page.
+- `:root { color-scheme: light dark }` declares more than a custom property.
+
+Any other sheet switches the next navigation to a full page load. Your app still works; the user
+waits for one ordinary page load. Real examples from apps in the top 30 by stars:
+`.cbi-button-save { display: none }`, `.error { … }`, `h4 { … }`, `div > label + select { … }`,
+`svg text { … }`.
 
 ---
 
-## 2. Namespace everything you declare
+## N. Names
 
-You are a guest in a document you share with the theme and with every other app.
+You share the page with the theme and with every other app.
 
-- **Classes and ids:** prefix with your package name — `.myapp-card`, `#cbi-myapp-…`. Do not claim
-  dictionary words. Seen in the wild and each one a live collision: `.hidden`, `.label`,
-  `.description`, `.centered`, `.skeleton`, `.toast`, `.dialog-title`, `.flex-row`, `.log-line`,
-  and `luci-lib-taskd`'s `[hidden] { display: none !important }`.
-- **Custom properties:** declare them on your root element, not on `:root`. `:root` is a shared
-  global scope: `luci-app-filemanager`'s hex editor puts `--clr-background`, `--clr-border`,
-  `--clr-highlight` there, and the file manager itself writes `color-scheme` there. A theme whose
-  tokens happen to share a name is silently repainted. (OpenClash gets this right: its ~90
-  properties are scoped to `.oc`.)
-- **Never ship a global reset.** `* { margin: 0; padding: 0 }` (OpenClash, twice) flattens the
-  theme's own chrome. Do not `@import` a CSS framework either (`pure.css` in vssr): it is not
-  yours to install document-wide.
-- **Never restyle stock LuCI selectors from outside your page.** `.cbi-button-up`, `.cbi-value`,
-  `.cbi-section-table-titles`, `ul.dropdown`, `table th`: the theme owns those. Your rule is
-  unlayered, so it beats every cascade layer the theme has. (footstrap catches such a sheet and
-  moves it into its `theme` layer; other themes do not.) Inside your own page, scope it:
-  `.myapp-root .cbi-value { … }`. (The same fact also works in your favour, see §3.2 below. Inside
-  your own subtree you outrank the theme automatically and never need `!important`.)
+### N-1. Classes and ids MUST start with your package name
 
----
-
-## 3. Colour: use the export tier, not literals
-
-Every LuCI theme exposes the same custom-property contract. Read it, with a literal fallback:
+Why: dictionary words collide with the theme and with other apps.
 
 ```css
+/* Bad */  .hidden { … }   .label { … }   .toast { … }
+/* Good */ .myapp-hidden { … }   #cbi-myapp-status { … }
+```
+
+Live collisions found in real apps: `.hidden`, `.label`, `.description`, `.centered`, `.skeleton`,
+`.toast`, `.dialog-title`, `.flex-row`, `.log-line`, and `luci-lib-taskd`'s
+`[hidden] { display: none !important }`.
+
+### N-2. Custom properties SHOULD be declared on your root element, not on `:root`
+
+Why: `:root` is shared by everyone. A theme token with the same name gets repainted without a
+warning. If you do use `:root`, every name there MUST carry your prefix: `--myapp-*`.
+
+```css
+/* Bad: luci-app-filemanager's hex editor */
+:root { --clr-background: …; --clr-border: …; --clr-highlight: …; }
+
+/* Good: OpenClash scopes its ~90 properties this way */
+.oc { --oc-accent: …; }
+```
+
+The file manager also writes `color-scheme` on `:root`, which changes the whole page.
+
+### N-3. You MUST NOT ship a global reset or a CSS framework
+
+Why: they restyle the theme's own sidebar, header and menus.
+
+```css
+/* Bad: OpenClash, twice */
+* { margin: 0; padding: 0 }
+/* Bad: vssr */
+@import url(pure.css);
+```
+
+### N-4. You MUST NOT restyle stock LuCI selectors outside your own page
+
+Why: the theme owns `.cbi-button-up`, `.cbi-value`, `.cbi-section-table-titles`, `ul.dropdown` and
+`table th` and `pre`. Your CSS is unlayered, so it beats every cascade layer of the theme. footstrap catches
+such a sheet and moves it into its own `theme` layer. Other themes do not. A sheet that names only
+your own classes stays unlayered.
+
+```css
+/* Bad: every table on every page */
+table th { … }
+/* Good: only inside your page */
+.myapp-root table th { … }
+```
+
+The same rule works for you inside your page. Your scoped CSS outranks the theme there without
+`!important`. See [C-4](#c-4-you-should-not-use-important-to-beat-the-theme).
+
+---
+
+## C. Colour
+
+### C-1. Colours MUST come from the export tier, with a literal fallback
+
+Why: every LuCI theme sets the same 26 names. A literal is right only on the one palette you looked
+at.
+
+```css
+/* Bad */
+color: #333;
+background: white;
+
+/* Good */
 color:            var(--text-color-high, #333);
 background-color: var(--background-color-low, #f5f5f5);
 border-color:     var(--border-color-medium, #ddd);
-/* status colours: primary / success / warn / error, each in high / medium / low */
 color:            var(--error-color-medium, #f44336);
-/* text ON a filled surface has its own ink: */
-background-color: var(--success-color-high, #2e7d32);
-color:            var(--on-success-color, #fff);
 ```
 
-### 3.1. The export surface is exactly 26 names, and it is colour-only
+The full list is in [The export tier](#the-export-tier-26-names) below.
 
-This is the whole contract. Nothing else is one.
+A colour with no family of its own still comes from the 26 names:
 
-| Family | Names | Notes |
-|---|---|---|
-| Surfaces | `--background-color-high` / `-medium` / `-low` | an **elevation** axis: `high` = raised (a card), `low` = recessed (the page) |
-| Rules | `--border-color-high` / `-medium` / `-low` | `high` = the visible rule, `low` = the hairline |
-| Text | `--text-color-highest` / `-high` / `-medium` / `-low` | four levels, not three |
-| Accent | `--primary-color-high` / `-medium` / `-low` + `--on-primary-color` | |
-| OK | `--success-color-high` / `-medium` / `-low` + `--on-success-color` | |
-| Warning | `--warn-color-high` / `-medium` / `-low` + `--on-warn-color` | the family is **`warn`**, not `warning` |
-| Error | `--error-color-high` / `-medium` / `-low` + `--on-error-color` | |
+| You need | Use |
+|---|---|
+| a neutral or grey badge | `--background-color-medium` with `--text-color-medium` |
+| an "info" colour | the `primary` family |
 
-**Names that do not exist anywhere, and therefore always fall through to your literal:**
-`--warning-color-*`, `--text-color` (no level), `--secondary-color-*`, `--font-sans`, `--font-mono`,
-`--disabled-opacity`. If you are reading one of those, you are not on the tier: you have a
-hardcoded colour with extra steps.
+footstrap has more than light and dark. These axes move the export tier with them:
 
-- **`--warn-color-medium` is CORRECT.** podkop's `var(--warn-color-medium, orange)` (7 uses) resolves
-  on footstrap and paints the themed amber. Do not "fix" it to `--warning-color-medium`. Nothing
-  defines that name, and the rename would silently drop every one of those 7 declarations into the
-  `orange` fallback.
-- **`--text-color` (justclash, 6 uses) does not exist.** It is `--text-color-high`.
+- `:root[data-palette]` swaps the whole colour set: default, hicontrast, bootstrap, 2020, forum.
+- The Tint slider shifts the hue of every surface (`:root[data-tint]` with `--fs-tint-h`, any hue
+  1–360).
 
-### 3.2. `--fs-*` is footstrap's PRIVATE tier — do not read it
+A `#f7f7f7` card chosen to match the default panel is wrong once the user picks hicontrast. A
+hand-picked amber is wrong once they drag the tint by 40°.
 
-Open `cascade.css` and you will find well over a hundred `--fs-*` custom properties with much better names than the
-export tier: `--fs-accent`, `--fs-panel2`, `--fs-radius`, `--fs-dim`, the whole z-index scale. **They
-are not yours.** They are internal, they are renamed and re-derived whenever the theme wants to, and
-no other LuCI theme has them at all. Only the `--*-color-*` names above are a contract.
+### C-2. Text on a coloured fill MUST use the matching `--on-*-color`
 
-The two-tier split is the same bug §2 warns you about, seen from the other side. `:root` is a
-**shared global scope**, and an app's stylesheet scoped to its own names stays **unlayered**, so it outranks every cascade layer
-the theme has. One app writing `:root { --accent: … }` would repaint the theme itself. So would one writing
-`--text-color-high`, a LuCI *convention* and therefore the likelier name for an app to declare.
-So footstrap reads *only* its private `--fs-*` names internally and derives the export names *from*
-them. (`styles/02-tokens.css`.)
+Why: each `--on-*-color` passes WCAG AA on top of the `-high` level of its family. The right ink
+differs per palette and per mode, so a hardcoded `#fff` fails on some of them.
 
-The practical consequence for you is the good half. **Your `:root` can no longer repaint the theme,
-so you can override anything the theme draws inside your own subtree. You never need `!important`
-to do it.** A sheet scoped to your own names stays unlayered, and unlayered beats every layer. If you have an
-`!important` in your app's CSS to win against the theme, delete it; it was never what was winning.
+Fill with `-high`. The `-medium` and `-low` levels are text colours; no ink is guaranteed on them.
 
-### 3.3. What the tier guarantees (and what to do with the guarantee)
+```css
+/* Bad */
+.myapp-badge { background: var(--success-color-high, #2e7d32); color: #fff; }
+/* Good */
+.myapp-badge { background: var(--success-color-high, #2e7d32); color: var(--on-success-color, #fff); }
+```
 
-footstrap measured all of this across the full matrix of
-{light, dark} × {default, hicontrast, bootstrap, 2020, forum} × seven tint values — 70 combinations:
+### C-3. You MUST NOT read `--fs-*` names
 
-- **Every level of `text` / `primary` / `success` / `warn` / `error` clears WCAG AA as TEXT** on all
-  three `--background-color-*` surfaces. So you may paint any of them as a `color:` and not check.
-- **The matching `--on-*-color` clears AA *on top of* its colour used as a fill.** So: **to put text
-  on a coloured fill, take the ink from `--on-*-color`. Do not invent one.** A hardcoded `#fff` on a
-  filled badge is the classic failure: the inks differ per palette and per mode.
-- **`high` / `medium` / `low` are three genuinely different colours**, not three aliases. If you paint
-  "no data" in `--primary-color-low`, it *will* read quieter than a live value. Two caveats:
-  `--background-color-*` runs the other way, `high` = raised. And `-low` is the faintest step a
-  palette can afford. Every colourway holds it above the AA floor, so text painted in it is legible
-  but has no room to be made fainter still.
+Why: they are footstrap's private tier. footstrap renames them whenever it needs to, and no other
+theme has them.
 
-### 3.4. The palette and tint axes come free — but only on the tier
+`cascade.css` holds over a hundred `--fs-*` properties: `--fs-accent`, `--fs-panel2`,
+`--fs-radius`, `--fs-dim`, the z-index scale. Their names are shorter and clearer than the export names. Only the
+26 `--*-color-*` names are a contract.
 
-footstrap has more axes than light/dark. `:root[data-palette="hicontrast"]` swaps the entire colour
-set, and a Tint slider re-hues every surface (`:root[data-tint]` with `--fs-tint-h` at any hue
-1–360). Both axes move the export tier with them, which is why the matrix above spans exactly those
-axes.
+Background, nothing to do: an app sheet is unlayered and outranks every theme layer. One app writing
+`:root { --accent: … }` or `:root { --text-color-high: … }` would repaint the theme. So footstrap
+reads only its `--fs-*` names and derives the export names from them
+(`styles/02-tokens.css`).
 
-An app on the tier follows all of it for free and stays legible. A hardcoded "close enough" colour
-does not move. A `#f7f7f7` card chosen to match the default panel is wrong the instant the user
-picks hicontrast. A hand-picked amber is wrong the instant they drag the tint 40°. **This is the
-real argument for this whole section:** a literal is right only on the one configuration you
-happened to look at.
+### C-4. You SHOULD NOT use `!important` to beat the theme
 
-### 3.5. The rest
+Why: your CSS, scoped to your own names, is unlayered. Unlayered CSS already beats every layer of
+the theme, and your `:root` cannot repaint the theme (see [C-3](#c-3-you-must-not-read---fs--names)).
 
-- **Never hardcode a surface.** `background: white` on a `position: fixed` modal (passwall) is a
-  white box on a dark page. `#1e1e1e` on a log terminal (justclash) is a black box on a light page.
-- **Never put text of colour C on a translucent tint of C.** The tint drags the background toward
-  the text and eats its own contrast. Because the tint is translucent, the result depends on
-  whatever is underneath, so no percentage is safe everywhere. Give the chip an opaque surface and let the
-  border carry the colour.
-- `<font color="green">` (dockerman, ssr-plus, OpenClash) is a status readout that vanishes on half
-  the palettes. Use `--success-color-medium`.
+If your app has an `!important` to win against the theme, delete it. It was never what made the
+rule win.
+
+### C-5. A surface MUST NOT be a literal colour
+
+Why: a literal surface looks wrong in the other mode.
+
+- passwall: `background: white` on a `position: fixed` modal. On a dark page it is a white box.
+- justclash: `#1e1e1e` on a log terminal. On a light page it is a black box.
+
+Use `--background-color-high` for a raised surface such as a modal or a card.
+
+### C-6. Text of colour C MUST NOT sit on a translucent tint of C
+
+Why: the tint pulls the background toward the text and eats the contrast. The result depends on
+what is underneath, so no opacity value is safe everywhere.
+
+```css
+/* Bad */
+.myapp-chip { color: var(--error-color-medium, #f44336); background: rgb(244 67 54 / 15%); }
+/* Good: opaque surface, the border carries the colour */
+.myapp-chip { color: var(--error-color-medium, #f44336);
+              background: var(--background-color-high, #fff);
+              border: 1px solid var(--error-color-medium, #f44336); }
+```
+
+### C-7. You MUST NOT use `<font color>`
+
+Why: `<font color="green">` (dockerman, ssr-plus, OpenClash) vanishes on half the palettes. Use
+`--success-color-medium`.
 
 ---
 
-## 4. Dark mode: `prefers-color-scheme` is the wrong question
+## The export tier: 26 names
 
-`@media (prefers-color-scheme: dark)` reports the operating system, not the theme. Every modern
-LuCI theme has its own light/dark switch. A user who forces dark on a light OS gets your light card
-on their dark page. netspeedtest, vssr, passwall and stock `ustreamer` all have this bug.
+This table is the whole contract. Nothing else is one. All 26 names are colours.
 
-Ask the theme instead, in this order:
+| Family | Names | Notes |
+|---|---|---|
+| Surfaces | `--background-color-high` / `-medium` / `-low` | elevation: `high` is raised (a card), `low` is recessed (the page) |
+| Rules | `--border-color-high` / `-medium` / `-low` | `high` is the visible rule, `low` is the hairline |
+| Text | `--text-color-highest` / `-high` / `-medium` / `-low` | four levels |
+| Accent | `--primary-color-high` / `-medium` / `-low`, `--on-primary-color` | |
+| OK | `--success-color-high` / `-medium` / `-low`, `--on-success-color` | |
+| Warning | `--warn-color-high` / `-medium` / `-low`, `--on-warn-color` | the family is `warn` |
+| Error | `--error-color-high` / `-medium` / `-low`, `--on-error-color` | |
+
+### Names that do not exist
+
+No LuCI theme defines these names, so they always fall through to your literal:
+
+| You wrote | Use instead |
+|---|---|
+| `--warning-color-*` | `--warn-color-*` |
+| `--text-color` | `--text-color-high` |
+| `--secondary-color-*` | none; pick a family above |
+| `--font-sans`, `--font-mono`, `--disabled-opacity` | none; the tier is colour only |
+
+Two real cases:
+
+- podkop writes `var(--warn-color-medium, orange)` 7 times. That is correct: it paints the themed
+  amber. Renaming it to `--warning-color-medium` would drop all 7 into the `orange` fallback.
+- justclash writes `--text-color` 6 times. That name does not exist; it is `--text-color-high`.
+
+### What the tier guarantees
+
+footstrap measured 70 combinations: {light, dark} × {default, hicontrast, bootstrap, 2020, forum}
+× seven tint values. In every one of them:
+
+- Every level of `text`, `primary`, `success`, `warn` and `error` passes WCAG AA as text on all
+  three `--background-color-*` surfaces. Paint any of them as `color:` without checking.
+- Each `--on-*-color` passes AA on top of its own colour used as a fill.
+- `high`, `medium` and `low` are three different colours. "No data" in `--primary-color-low` reads
+  quieter than a live value in `-high`.
+
+Two caveats:
+
+- For `--background-color-*`, `high` means raised, not stronger. For every other family, `high` is
+  the strongest colour.
+- `-low` is the faintest step a palette can afford. Text in it is legible, but there is no fainter
+  step below it.
+
+---
+
+## D. Dark mode
+
+### D-1. You MUST NOT detect dark mode with `prefers-color-scheme`
+
+Why: `prefers-color-scheme` reports the operating system, not the theme. Every modern LuCI theme
+has its own light/dark switch. A user who forces dark on a light OS gets your light card on a dark
+page. netspeedtest, vssr, passwall and stock `ustreamer` have this bug.
+
+### D-2. You SHOULD NOT detect dark mode at all
+
+Why: if every colour comes from the export tier, dark mode already works. `luci-app-nikki` reads no
+theme state and looks right on every theme.
+
+### D-3. When you must detect it, you MUST ask the theme
+
+Check these in this order:
 
 ```js
 function isDark() {
     const root = document.documentElement;
-    if (root.dataset.darkmode) return root.dataset.darkmode === 'true';  // OpenClash + luci-app-internet-detector use this
-    if (root.dataset.theme)    return root.dataset.theme === 'dark';     // footstrap, justclash's convention
-    if (root.dataset.bsTheme)  return root.dataset.bsTheme === 'dark';   // Bootstrap-5 convention
-    const m = getComputedStyle(document.body).backgroundColor.match(/\d+/g);   // works on any theme
+    if (root.dataset.darkmode) return root.dataset.darkmode === 'true';  // OpenClash, luci-app-internet-detector
+    if (root.dataset.theme)    return root.dataset.theme === 'dark';     // footstrap, justclash
+    if (root.dataset.bsTheme)  return root.dataset.bsTheme === 'dark';   // Bootstrap 5
+    const m = getComputedStyle(document.body).backgroundColor.match(/\d+/g);   // any theme
     return m && m.length >= 3
         ? (0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2]) / 255 < 0.5
         : false;
 }
 ```
 
-There are four dialects in the wild. footstrap stamps three of them on `:root` before first paint:
-`data-darkmode`, `data-theme` and `data-bs-theme`. So any of these checks works.
-`luci-app-internet-detector` keys its dark block off `:root[data-darkmode="true"]` and therefore
-looks right here with no changes at all.
-
-In CSS, the same thing:
-
 ```css
-.myapp-card { background: var(--background-color-low, #fff); }         /* follows the theme already */
-:root[data-theme="dark"] .myapp-card { /* only if you truly need a dark-specific override */ }
+/* Bad */
+@media (prefers-color-scheme: dark) { .myapp-card { … } }
+/* Good: follows the theme on its own */
+.myapp-card { background: var(--background-color-low, #fff); }
+/* Good, only if you need a dark-only override */
+:root[data-theme="dark"] .myapp-card { … }
 ```
 
-- The luminance fallback works everywhere, but only because the theme keeps `body`'s background
-  **opaque**. Do not assume any single attribute exists.
-- **Best of all: do not detect at all.** If every colour you use comes from the export tier, dark
-  mode is already handled for you. That is what the tier is for. `luci-app-nikki` reads zero
-  theme state and looks right everywhere.
+Facts behind this code:
+
+- Apps use four dialects. footstrap sets three of them on `:root` before the first paint:
+  `data-darkmode`, `data-theme` and `data-bs-theme`.
+- `luci-app-internet-detector` keys its dark styles off `:root[data-darkmode="true"]`, so it looks
+  right on footstrap with no changes.
+- The brightness fallback works only because themes keep the `body` background opaque. Do not rely
+  on any single attribute existing.
 
 ---
 
-## 5. Editors and other heavy widgets
+## W. Editors and heavy widgets
 
-- **Do not hardcode the editor's colour theme.** mosdns and AdGuardHome pin CodeMirror to
-  `dracula`, ssclash pins ACE to `tomorrow_night_bright`: a permanently black editor on a light
-  page. Pick the editor theme from `isDark()` above (OpenClash does this correctly:
-  `themeExtension(isDark)`).
-- **Do not install a shared library into a shared path.** AdGuardHome ships its CodeMirror to
-  `/luci-static/resources/codemirror/`; two apps shipping different versions overwrite each other.
-  Put it under `/luci-static/resources/view/<yourapp>/`.
-- **Iframes:** stock `luci-app-ttyd` is the reference. Size it `width: 100%; min-height: …;
-  resize: vertical`, take the port from UCI, and mirror the page's protocol. Do not hardcode a port
-  (dockerman: `:7682`). Do not paint the iframe `background: #fff` (netspeedtest): the embedded page
-  decides its own colours.
-- **`z-index`:** stay inside a sane range. passwall's dropdown sits at `2147483647` and OpenClash's
-  fullscreen editor at `999999 !important`. A theme's own overlays and dropdowns cannot coexist
-  with that. Nothing you render needs to be above everything ever.
-- Never `body { pointer-events: none }` (passwall, while its modal is open): if anything navigates
-  while the class is on, the entire UI is dead.
+### W-1. The editor's colour theme MUST follow the page's mode
 
----
+Why: a pinned dark theme is a black editor on a light page. mosdns and AdGuardHome pin CodeMirror
+to `dracula`; ssclash pins ACE to `tomorrow_night_bright`.
 
-## 6. Layout: the viewport is not your column
+Pick the editor theme from `isDark()` in [D-3](#d-3-when-you-must-detect-it-you-must-ask-the-theme).
+OpenClash does this right: `themeExtension(isDark)`.
 
-A theme puts a sidebar next to your page. On footstrap that is 224 px. On a 1024 px screen your
-content column is ~740 px wide while `@media (max-width: 768px)` still says "desktop". Some apps in
-the survey stacked their cards by a viewport query: justclash at 56rem, podkop at 900 px,
-netspeedtest at 768 px. Every one of them breaks in exactly that band.
+### W-2. A bundled library MUST go under your own path
 
-- Prefer `@container` queries, or measure your own container and set a class.
-- Do not force `table-layout: fixed` plus a `min-width` on every cell (filemanager). That defeats
-  any responsive card-stacking a theme does.
-- Avoid fixed px widths on containers; `width: 100%; max-width: …` is what you meant.
+Why: two apps that ship different versions to a shared path overwrite each other. AdGuardHome ships
+CodeMirror to `/luci-static/resources/codemirror/`.
 
----
+Put it under `/luci-static/resources/view/<YOURAPP>/`.
 
-## 7. Be SPA-friendly (and it costs you nothing on a classic theme)
+### W-3. An iframe SHOULD follow stock `luci-app-ttyd`
 
-A modern theme may re-instantiate your view without ever reloading the document.
+Do this:
 
-- `window.onload` and `DOMContentLoaded` fire **once per document**. A handler registered there
-  (diskman, passwall's `optimize_cbi_ui.htm`) silently stops working after the first navigation.
-  Do your work in `render()`.
-- Clear your own `setInterval`s and pollers when the view goes away; register pollers through
-  `L.Poll` and LuCI will do it for you.
-- Do not append persistent nodes to `document.body` (podkop's toast container, taskd's dialog):
-  they survive the view swap. Put them in your view tree.
-- Do not add a document-level `popstate` handler that navigates (istore). You will race the
-  theme's router and win, wrongly.
-- **Do not hide the stock buttons with CSS.** Set `handleSave`, `handleSaveApply` and `handleReset`
-  to `null` in your view (as `luci-app-partexp` and `luci-app-ttyd` do). That is the supported way,
-  it needs no `!important`, and it does not leak onto the next page.
+- Size it `width: 100%; min-height: …; resize: vertical`.
+- Take the port from UCI.
+- Use the same protocol as the page.
+
+Do not:
+
+- Hardcode a port. dockerman uses `:7682`.
+- Paint the iframe `background: #fff`, as netspeedtest does. The embedded page picks its own colours.
+
+### W-4. `z-index` SHOULD stay in a normal range
+
+Why: the theme's own overlays and dropdowns cannot sit above a huge value. passwall's dropdown uses
+`2147483647`; OpenClash's fullscreen editor uses `999999 !important`. Nothing you render needs to be
+above everything.
+
+### W-5. You MUST NOT set `body { pointer-events: none }`
+
+Why: if a navigation happens while it is set, the whole UI stops responding. passwall sets it while
+its modal is open.
 
 ---
 
-## 8. Checklist
+## L. Layout
+
+### L-1. Breakpoints SHOULD follow your container, not the viewport
+
+Why: the theme puts a sidebar next to your page. On footstrap it is 224 px wide. On a 1024 px
+screen your column is about 740 px, while `@media (max-width: 768px)` still says "desktop".
+
+Apps that stack cards by viewport break in exactly that band: justclash at 56rem, podkop at 900 px,
+netspeedtest at 768 px.
+
+```css
+/* Bad */
+@media (max-width: 768px) { .myapp-cards { flex-direction: column; } }
+/* Good */
+.myapp-root { container-type: inline-size; }
+@container (max-width: 768px) { .myapp-cards { flex-direction: column; } }
+```
+
+Pick the breakpoint from the width your cards need, not from a device size. `container-type`
+makes the element ignore its children's width, so put it on a block that fills its column.
+
+If you cannot use `@container`, measure your own container in JS and set a class.
+
+### L-2. Tables SHOULD NOT combine `table-layout: fixed` with a `min-width` on every cell
+
+Why: it stops the theme from stacking table rows into cards on a narrow screen. filemanager does
+this.
+
+### L-3. Containers SHOULD NOT have a fixed px width
+
+```css
+/* Bad */  .myapp-panel { width: 900px; }
+/* Good */ .myapp-panel { width: 100%; max-width: 900px; }
+```
+
+---
+
+## P. Page lifetime
+
+A modern theme can create your view again without reloading the page. These rules cost nothing on a
+classic theme.
+
+### P-1. You MUST NOT do your work in `window.onload` or `DOMContentLoaded`
+
+Why: both fire once per page. After the first navigation your handler never runs again. diskman
+and passwall's `optimize_cbi_ui.htm` break this way.
+
+Do the work in `render()`.
+
+### P-2. Pollers and timers MUST stop when your view goes away
+
+Why: a leftover `setInterval` keeps running on every page after yours.
+
+Register pollers through `L.Poll`; LuCI stops them for you. Clear any other `setInterval` yourself.
+
+### P-3. You MUST NOT append lasting nodes to `document.body`
+
+Why: they survive the view swap. podkop's toast container and taskd's dialog do this.
+
+Put them in your view tree.
+
+### P-4. You MUST NOT add a `popstate` handler that navigates
+
+Why: it races the theme's router, and both navigate. istore does this.
+
+### P-5. Hide stock buttons through the view, not CSS
+
+The rule: you MUST set `handleSave`, `handleSaveApply` and `handleReset` to `null`.
+
+Why: this is the supported way. It needs no `!important` and does not leak onto the next page.
+`luci-app-partexp` and `luci-app-ttyd` do this.
+
+```js
+// Bad: hides Save on every page after yours (see S-1)
+document.head.appendChild(E('style', [ '.cbi-button-save { display: none !important }' ]));
+
+// Good: the view file starts with 'require view';
+return view.extend({
+    handleSave: null,
+    handleSaveApply: null,
+    handleReset: null,
+    render() { … }
+});
+```
+
+---
+
+## Checklist
 
 Tick every line before you publish:
 
-- [ ] `<style>` returned inside the view tree, not appended to `<head>`
-- [ ] Every class, id and custom property prefixed with the app name
-- [ ] No `:root` rule beyond your own prefixed custom properties, no `* { … }`, no imported CSS framework
-- [ ] No stock `.cbi-*` / `table` / `pre` selector styled outside the app's own subtree
-- [ ] All colours from the 26 `--*-color-*` export names, with a literal fallback; `warn`, not `warning`
-- [ ] No `--fs-*` read anywhere — that is footstrap's private tier, not a contract
-- [ ] Text on a coloured fill takes its ink from `--on-*-color`, never a hardcoded `#fff`
-- [ ] No `!important` used to beat the theme; your CSS, scoped to your own names, is unlayered and already outranks every layer
-- [ ] Dark mode read from `data-darkmode` / `data-theme` / `data-bs-theme` / body luminance, never `prefers-color-scheme`
-- [ ] Editor theme chosen from the page's mode, not hardcoded
-- [ ] Layout keyed to the container, not the viewport
-- [ ] `handleSaveApply = null` instead of hiding stock buttons
-- [ ] No `window.onload`, no body-level leftovers, no `popstate` hijack, no `z-index: 2147483647`
+- [ ] S-1: `<style>` is inside the view tree, not appended to `<head>`.
+- [ ] N-1, N-2: every class, id and custom property starts with the app name.
+- [ ] N-2, N-3: custom properties on your root element, or on `:root` only as `--myapp-*`; no `* { … }`, no CSS framework.
+- [ ] N-4: no stock `.cbi-*`, `table` or `pre` selector outside your own subtree.
+- [ ] C-1: every colour is one of the 26 export names; a literal appears only as its fallback;
+      `warn`, not `warning`.
+- [ ] C-2: text on a coloured fill uses `--on-*-color`, never a hardcoded `#fff`.
+- [ ] C-3: no `--fs-*` read anywhere.
+- [ ] C-4: no `!important` used to beat the theme.
+- [ ] D-1, D-2: dark mode is not detected at all, or it comes from `data-darkmode`, `data-theme`, `data-bs-theme` or body brightness,
+      never from `prefers-color-scheme`.
+- [ ] W-1: the editor theme follows the page's mode.
+- [ ] L-1: layout follows the container, not the viewport.
+- [ ] P-5: `handleSave`, `handleSaveApply` and `handleReset` set to `null` instead of hiding stock
+      buttons with CSS.
+- [ ] P-1, P-3, P-4, W-4: no `window.onload`, no leftovers on `body`, no `popstate` handler, no
+      `z-index: 2147483647`.
 
-Apps to read as references:
+## Apps to copy from
 
-- `luci-app-nikki`: zero injected CSS, zero colour literals, stock forms only.
-- Stock `luci-app-ttyd`: the iframe done right.
-- `luci-app-smartdns`: its `<style>` is returned inside the `.cbi-map` it belongs to.
-- `luci-app-internet-detector`: namespaced `:root { --app-id-* }` custom properties, and a dark
-  block keyed off the theme's attribute.
+| App | What it does right |
+|---|---|
+| `luci-app-nikki` | no injected CSS, no colour literals, stock forms only |
+| stock `luci-app-ttyd` | the iframe |
+| `luci-app-smartdns` | its `<style>` is returned inside the `.cbi-map` it belongs to |
+| `luci-app-internet-detector` | custom properties scoped as `:root { --app-id-* }`, dark styles keyed off the theme's attribute |

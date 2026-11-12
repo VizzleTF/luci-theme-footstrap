@@ -1,12 +1,14 @@
 # Contributing
 
-Patches are welcome. This page is the short version; every rule below is written out, with the
-reason behind it, in [`docs/`](docs/README.md).
+How to send a patch to luci-theme-footstrap, for anyone who wants to change the theme.
+The most important rule: a change is not finished until it has run on a real OpenWrt router, on both package managers.
 
-## Before you start
+This page is the short version. Every rule is written out, with the reason behind it, in [`docs/`](docs/README.md).
 
-Read [`docs/architecture.md`](docs/architecture.md) — what LuCI expects of a theme and where this
-one plugs in. Then the page for the area you are touching:
+## Read two pages before you start
+
+1. Read [`docs/architecture.md`](docs/architecture.md). It says what LuCI expects of a theme and where this one plugs in.
+2. Read the page for the area you are touching:
 
 | Touching | Read |
 |---|---|
@@ -17,47 +19,64 @@ one plugs in. Then the page for the area you are touching:
 
 The rule list itself is [`docs/conventions.md`](docs/conventions.md), with the reason for each rule.
 
-## The loop
+## Test every change on a real router
 
-Two checks run on a real OpenWrt router. `tools/e2e.mjs` installs the last release, upgrades it to
-your build, opens every menu page under footstrap and under bootstrap, then removes and reinstalls
-the package. `tools/anchor-check.mjs` checks that a poll tick above a parked reader leaves them in
-place. [`docs/verifying.md`](docs/verifying.md) says what they prove and how to run them;
+Two checks run on a real OpenWrt router:
+
+| Check | What it does |
+|---|---|
+| `tools/e2e.mjs` | Installs the last release and upgrades it to your build. Opens every menu page under footstrap and under bootstrap. Then removes and reinstalls the package. |
+| `tools/anchor-check.mjs` | Checks that a poll tick above a parked reader leaves them in place. |
+
+[`docs/verifying.md`](docs/verifying.md) says what they prove and how to run them.
 [`docs/development.md`](docs/development.md) sets up the `owlab` routers they run on.
+Fixing a CSS bug: follow [the path](docs/development.md#fixing-a-css-bug-the-path). The two checks do not judge how a page looks; a computed-style diff proves a CSS change.
 
-A change is not finished until it has run on a real OpenWrt userland — both package managers,
-25.12/apk and 24.10/opkg. CI's `e2e` and `anchor` jobs run the checks on both for every pull
-request that touches more than documentation. If you cannot run it yourself, say so in the pull
-request instead of describing the change as verified. An untested change described as tested is
-worse than an untested one.
+Rule: a change is not finished until it has run on a real OpenWrt userland with both package managers, 25.12/apk and 24.10/opkg.
 
-No npm package is installed on a router. The release build (`tools/stage.sh`) runs uglify-js and
-acorn over the shipped JS and templates. But `luci.mk` copies `htdocs/` and `ucode/` verbatim, and
-the OpenWrt buildbot has no node. So the tooling may need node, and the package source never may.
+CI's `e2e` and `anchor` jobs run the checks on both for every pull request that touches more than documentation.
+
+Rule: if you cannot run the checks yourself, say so in the pull request.
+Why: an untested change described as tested is worse than an untested one.
+
+## Keep node out of the package source
+
+Rule: the tooling may need node; the package source never may.
+Why: no npm package is installed on a router. The OpenWrt buildbot has no node, and `luci.mk` copies `htdocs/` and `ucode/` verbatim.
+
+The release build (`tools/stage.sh`) runs uglify-js and acorn over the shipped JS and templates.
 
 ## What a pull request needs
 
-- **One concern per branch.** A layout fix and a packaging fix are two branches.
-- **Conventional Commits**, in English, present tense: `fix(chrome): …`, `feat(appearance): …`.
-- **A changelog entry in both files** (`CHANGELOG.md` and `CHANGELOG_ru.md`, under `## [Unreleased]`,
-  same order) for a change a theme user sees. CI, tests, tooling and docs changes get no entry. Run
-  `npm run changelog` to check it; CI does not run it. The contract:
-  [`docs/releasing.md`](docs/releasing.md).
-- **A green `e2e` and `anchor`** on both routers. A red run is fixed in the code under it, not in
-  the check.
-- **A comment that says why.** The codebase's comments carry the constraint, the alternative that
-  failed and the number that was measured — not a restatement of the line below them. A negative
-  result is worth one line and saves the next person the experiment.
+| Need | Detail |
+|---|---|
+| One concern per branch | A layout fix and a packaging fix are two branches. |
+| Conventional Commits | In English, present tense: `fix(chrome): …`, `feat(appearance): …`. |
+| A changelog entry in both files | See [Changelog entries](#write-a-changelog-entry-in-both-files-for-user-visible-changes) below. |
+| A green `e2e` and `anchor` on both routers | A red run is fixed in the code under it, not in the check. |
+| A comment that says why | See [Comments](#write-comments-that-say-why) below. |
 
-## Style
+### Write a changelog entry in both files for user-visible changes
 
-`.editorconfig` covers indentation and line endings; match the surrounding code for the rest. Do
-not reformat code you are not otherwise changing.
+1. Add the entry to `CHANGELOG.md` and `CHANGELOG_ru.md`, under `## [Unreleased]`, in the same order.
+   This applies to a change a theme user sees. CI, tests, tooling and docs changes get no entry.
+2. Run `npm run changelog` to check it. CI does not run it.
 
-Translations go through the `po/` catalogues — run `luci-theme-footstrap/update-po.sh` after
-touching any `_()` string.
+The contract is in [`docs/releasing.md`](docs/releasing.md).
 
-## Reporting things
+### Write comments that say why
 
-A bug or an idea: open an issue. A vulnerability: [SECURITY.md](SECURITY.md) — privately, not in an
-issue.
+The codebase's comments carry the constraint, the alternative that failed and the number that was measured.
+They do not restate the line below them.
+A negative result is worth one line: it saves the next person the experiment.
+
+## Match the surrounding style
+
+- `.editorconfig` covers indentation and line endings. Match the surrounding code for the rest.
+- Do not reformat code you are not otherwise changing.
+- Translations go through the `po/` catalogues. Run `luci-theme-footstrap/update-po.sh` after touching any `_()` string.
+
+## Report bugs in issues, vulnerabilities privately
+
+A bug or an idea: open an issue.
+A vulnerability: report it privately, as [SECURITY.md](SECURITY.md) says, not in an issue.

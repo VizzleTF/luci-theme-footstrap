@@ -8,11 +8,11 @@
 # !important to override base.
 #
 # Minified unless --dev: uhttpd serves CSS with no gzip, so every byte is a wire byte. Comments and
-# whitespace go, and five spellings shrink (docs/css.md, "The build"): [a="b"] -> [a=b], the space
-# before !important, ::before -> :before, the spaces beside * and / in a declaration, and a flex
-# triple with a keyword form (1 1 auto -> auto). Nothing else in a selector or declaration is
-# rewritten, which is why csstidy stays off (it mangles :has() and color-mix()). Needs only cat and
-# awk, so an OpenWrt buildbot can run it.
+# whitespace go, and six spellings shrink (docs/css.md, "The build"): [a="b"] -> [a=b], the space
+# before !important, ::before -> :before, the spaces beside * and / in a declaration, a flex
+# triple with a keyword form (1 1 auto -> auto), and transparent -> #0000. Nothing else in a
+# selector or declaration is rewritten, which is why csstidy stays off (it mangles :has() and
+# color-mix()). Needs only cat and awk, so an OpenWrt buildbot can run it.
 set -eu
 
 D="$(cd "$(dirname "$0")" && pwd)"

@@ -316,8 +316,8 @@ export function describePendingRequests(requests, limit = 10) {
  * starts a generation before each navigation, `tag(id)` records the generation a Request was SEEN
  * in, `isCurrent(id)` says whether it still matches. A response from an older generation arrived
  * after its page was navigated away from, so CDP has discarded its body ("No resource with given
- * identifier found"); the dashboard `login()` lands on does this (docs/development.md, "The
- * playground"). A plain `Map`, not `WeakMap`, so a string id works too. */
+ * identifier found"); the dashboard `login()` lands on does this (measured; the note left
+ * docs/development.md in 13c2642). A plain `Map`, not `WeakMap`, so a string id works too. */
 export function createGenerationGate() {
 	let generation = 0;
 	const tagged = new Map();
@@ -331,9 +331,9 @@ export function createGenerationGate() {
 
 /* Polls `isQuiet()` until it returns true, or throws once the wait passes `timeoutMs`, naming what
  * is outstanding through `describe()`. A fixed post-load sleep is not enough (a 300 ms settle
- * dropped 8 of 9 overlay keys: docs/development.md, "The playground"). A page whose `L.Poll` never
- * stops still returns at the first gap wider than `quietMs`; `timeoutMs` caps the page where none
- * opens. `now`/`sleep` are injected for a fake clock; `pollMs` bounds the reading, never the wait. */
+ * dropped 8 of 9 overlay keys, measured; the note left docs/development.md in 13c2642). A page
+ * whose `L.Poll` never stops still returns at the first gap wider than `quietMs`; `timeoutMs` caps
+ * the page where none opens. `now`/`sleep` are injected for a fake clock; `pollMs` bounds the reading, never the wait. */
 export async function waitForQuiet({
 	isQuiet, quietMs, timeoutMs,
 	now = Date.now, sleep = delay, pollMs, describe,

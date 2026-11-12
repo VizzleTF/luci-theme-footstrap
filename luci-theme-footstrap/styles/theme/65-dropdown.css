@@ -23,7 +23,7 @@
 	/* ---- cbi-dropdown widget: the JS select used across all forms ---- */
 	/* machinery absorbed from base, driven by ui.js attributes; the state machine below is
 	 * UNFLAGGED, stating openly what upstream's !important flags resolved — docs/css.md
-	 * "Dropdown: the display state machine, unflagged" has the specificity table. */
+	 * "Dropdown: the display state machine, unflagged" has the rule. */
 	.cbi-dropdown {
 		display: inline-flex;
 		cursor: pointer;
@@ -115,7 +115,7 @@
 		margin-inline: 0 var(--fs-space-1);
 	}
 
-	/* ---- the display state machine, on specificity (docs/css.md has the per-selector table) ---- */
+	/* ---- the display state machine, on specificity (docs/css.md "Dropdown: the display state machine, unflagged") ---- */
 	/* a closed optional dropdown with an empty value renders EMPTY unflagged too: the placeholder
 	 * hider out-specifies the generic shower. :not([open]) keeps this out of the open list. */
 	.cbi-dropdown > ul > li[display],

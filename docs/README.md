@@ -1,9 +1,9 @@
 # Documentation
 
-Developer documentation for `luci-theme-footstrap`. Installing and using the theme is in the
-[repository README](../README.md).
+The index of developer documentation for `luci-theme-footstrap`, for anyone changing or packaging the theme.
+Every page here stands on its own: start wherever your question is.
 
-Every page here stands on its own — start wherever your question is.
+Installing and using the theme is in the [repository README](../README.md).
 
 ## Start here
 
@@ -39,24 +39,26 @@ Every page here stands on its own — start wherever your question is.
 | Page | Answers |
 |---|---|
 | [luci-app-styling-guide.md](luci-app-styling-guide.md) | How to style a `luci-app-*` so it works under any theme |
-| [luci-app-styling-guide_ru.md](luci-app-styling-guide_ru.md) | The same guide in Russian — the one page here that is mirrored |
+| [luci-app-styling-guide_ru.md](luci-app-styling-guide_ru.md) | The same guide in Russian. It is the one page here that is mirrored. |
 
-There is also a self-contained developer portal with the colour-token grid, the component markup
-and a style checker: <https://vizzletf.github.io/luci-theme-footstrap/>.
+The developer portal is self-contained: <https://vizzletf.github.io/luci-theme-footstrap/>.
+It holds the colour-token grid, the component markup and a style checker.
 
-## Not documentation
+## Files here that are not documentation
 
 | File | What it is |
 |---|---|
-| `gallery.html` | every widget LuCI can emit, with the real class names — part of the developer portal |
-| `devkit.src.html` | source of the developer portal |
-| `devkit.html` | built from `devkit.src.html`, `gallery.html` and `02-tokens.css` by the `pages` job. Generated, gitignored, never committed |
-| the playground | not a page here at all — recorded from a real router by `tools/playground/*` and CI's `playground` job, published as a release asset and fetched into Pages by `pages.yml`. [ci.md](ci.md) |
-| `screenshots/` | desktop and phone shots from a dev router by `screenshots/capture.py`, linked from the README's Screenshots link; the README's own images are `assets/readme/` |
+| `gallery.html` | Every widget LuCI can emit, with the real class names. Part of the developer portal. |
+| `devkit.src.html` | Source of the developer portal. |
+| `devkit.html` | Built from `devkit.src.html`, `gallery.html` and `02-tokens.css` by the `pages` job. Generated, gitignored, never committed. |
+| the playground | Not a page here at all. Recorded from a real router by `tools/playground/*` and CI's `playground` job. Published as a release asset and fetched into Pages by `pages.yml`. See [ci.md](ci.md). |
+| `screenshots/` | Desktop and phone shots from a dev router by `screenshots/capture.py`. Linked from the README's Screenshots link. The README's own images are `assets/readme/`. |
 
-## Conventions of these pages
+## Rules for these pages
 
-- One page, one job. If a page needs its own table of contents, it is probably two pages.
-- One fact lives in one place. Pages link to each other rather than repeating.
-- Every rule says what it protects against. History lives in the changelog, not here.
-- Documentation that has stopped being true is deleted, not annotated.
+| Rule | Detail |
+|---|---|
+| One page, one job. | A page that grows past one job splits in two. A long page opens with a short version and a contents list. |
+| One fact lives in one place. | Pages link to each other rather than repeating. |
+| Every rule says what it protects against. | History lives in the changelog, not here. |
+| Documentation that has stopped being true is deleted. | It is not annotated. |

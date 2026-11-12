@@ -1,47 +1,135 @@
 # Development
 
-How to bring up a dev router, push a change to it, and prove the change did what you meant.
+How to bring up a dev router, push a change to it, and prove the change did what you meant. For
+anyone changing the theme.
+
+The main rule: a change is not finished until it has run on a real OpenWrt userland.
 
 Rules a patch has to follow: [conventions.md](conventions.md). Building a release: [ci.md](ci.md).
 
-## Two modes of working
+Run every command on this page from the repo root, where `owlab.yaml` is. `../tmp/` is a sibling
+of the checkout, outside it.
 
-1. **The fast loop (no package build):** edit files and push them straight to a router. The theme is
-   templates plus static assets; the only build step is `build-css.sh`, which concatenates `styles/`
-   into `cascade.css` with nothing but `cat` and `awk`. This is the normal mode.
-2. **A real package:** for distribution, and for verifying a clean install.
+## Short version
 
-## Install owlab first — it is not optional
+1. Install owlab and owfeed at the CI pin, plus Docker, Go, Node.js and `gh`. Run `npm ci` in the
+   repo root: [Install owlab and the tools first](#install-owlab-and-the-tools-first).
+2. Start the pair: `owlab up owrt2512 owrt2410`. Plain `owlab up` starts every router in
+   `owlab.yaml`, `owrtsnap` included.
+3. Iterate with the theme pushed: `owlab sync --watch`. Log in as `root` with an empty password.
+4. Prove a CSS change with a computed-style diff. `tools/e2e.mjs` and `tools/anchor-check.mjs` do
+   not judge how a page looks: [What proves what](#what-proves-what).
+5. Run `tools/e2e.mjs` last, on a router reset with `owlab up --rebuild <router>`. Why: e2e wants a
+   router without the theme, and a sync puts the theme on it: [verifying.md](verifying.md).
+6. Before you trust a measurement, read [The stand's own traps](#the-stands-own-traps).
+7. Anything that touches the build pipeline is measured on a package: `./tools/stage.sh && owfeed build`.
 
-A change is not finished until it has run on a real OpenWrt userland, so owlab is a required part
-of this checkout. The rule: [conventions.md](conventions.md).
+## Fixing a CSS bug: the path
+
+1. Install the tools: [Install owlab and the tools first](#install-owlab-and-the-tools-first).
+2. Start both routers and push the theme: `owlab up owrt2512 owrt2410`, then `owlab sync --watch`
+   in a terminal of its own. Expected: [the checks in The dev stand](#the-dev-stand-runs-real-openwrt-routers-from-owlabyaml).
+3. Edit `styles/` and press F5. If nothing changes, see
+   [Caches while iterating](#caches-while-iterating).
+4. Prove the change off the router with a computed-style diff over `docs/gallery.html`:
+   [css.md, "Proving a CSS change"](css.md#proving-a-css-change). The gallery cannot see two kinds
+   of rule: the chrome (it has no `header.ut`) and a page-scoped rule (no element there carries
+   `data-page`). For those, do step 5.
+5. Prove it on the router page itself: run the same `computed-diff.mjs` against a router URL, old
+   CSS against new. Steps and the pass criterion:
+   [css.md, "On a router: the chrome and page-scoped rules"](css.md#on-a-router-the-chrome-and-page-scoped-rules).
+6. Look at the change by hand on both routers:
+   [The test matrix](#the-test-matrix-pages-and-modes-to-check-by-hand).
+7. Stop `owlab sync --watch`. Then run e2e on each router, which also runs `tools/anchor-check.mjs`
+   at the end of its step 4, while footstrap is active. Exact commands:
+   [verifying.md, "Run e2e on both routers"](verifying.md#run-e2e-on-both-routers). In short:
+   1. Build: `FOOTSTRAP_VERSION=9999.0.0 ./tools/stage.sh && owfeed build`.
+   2. Download the last release:
+      `rm -rf ../tmp/old-apk && gh release download --repo VizzleTF/luci-theme-footstrap --pattern 'luci-theme-footstrap-*.apk' --dir ../tmp/old-apk`.
+      Expected: `ls ../tmp/old-apk` prints one file. The ipk line for `owrt2410` is in verifying.md.
+   3. Reset the router: `owlab up --rebuild owrt2512`. e2e needs a router without the theme.
+   4. Run `node tools/e2e.mjs --router owrt2512 …`, then the same on `owrt2410`.
+8. Put the working tree back on the routers: `owlab sync`. e2e leaves the package installed but
+   bootstrap active.
+9. In the pull request, say which routers the checks ran on: [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## Contents
+
+- [Fixing a CSS bug: the path](#fixing-a-css-bug-the-path)
+- [Two ways to work: the fast loop and a real package](#two-ways-to-work-the-fast-loop-and-a-real-package)
+- [Install owlab and the tools first](#install-owlab-and-the-tools-first)
+- [The dev stand runs real OpenWrt routers from owlab.yaml](#the-dev-stand-runs-real-openwrt-routers-from-owlabyaml)
+- [ImmortalWrt stands (on demand)](#immortalwrt-stands-on-demand)
+- [Pushing a change with owlab sync](#pushing-a-change-with-owlab-sync)
+- [If you break it, LuCI falls back and uci recovers](#if-you-break-it-luci-falls-back-and-uci-recovers)
+- [Caches while iterating](#caches-while-iterating)
+- [Verifying a change: templates, CSS, behaviour](#verifying-a-change-templates-css-behaviour)
+- [Proving it on a router](#proving-it-on-a-router)
+- [Proving it on hardware](#proving-it-on-hardware)
+- [The playground: recording and replaying a real router](#the-playground-recording-and-replaying-a-real-router)
+- [The stand's own traps](#the-stands-own-traps)
+- [The test matrix: pages and modes to check by hand](#the-test-matrix-pages-and-modes-to-check-by-hand)
+- [Building a package locally](#building-a-package-locally)
+
+## Two ways to work: the fast loop and a real package
+
+| Mode | What it is | When |
+|---|---|---|
+| The fast loop (no package build) | Edit files and push them straight to a router. | The normal mode. |
+| A real package | Build and install the package. | For distribution, and for verifying a clean install. |
+
+The fast loop works because the theme is templates plus static assets. The only build step is
+`build-css.sh`. It concatenates `styles/` into `cascade.css` with nothing but `cat` and `awk`.
+
+## Install owlab and the tools first
+
+owlab is a required part of this checkout, not an option.
+
+Why: a change is not finished until it has run on a real OpenWrt userland. The rule:
+[conventions.md](conventions.md).
+
+Install the version CI uses. Find the pins first:
 
 ```sh
-go install owfeed.org/owlab/cmd/owlab@latest
+grep -n 'owfeed/owlab/setup@\|owfeed/owfeed/setup@' .github/workflows/build.yml
+```
+
+Expected: lines like `uses: owfeed/owlab/setup@v0.7.0` and `uses: owfeed/owfeed/setup@v0.5.6`. The
+tag after `@` is the version. Install it, and check the machine:
+
+```sh
+go install owfeed.org/owlab/cmd/owlab@<OWLAB_VERSION>
 owlab doctor                  # what this machine can do (Docker, arch, emulation)
 ```
 
-Besides owlab, the checkout needs:
+Besides owlab, the checkout needs these tools:
 
-- Docker, for the stand;
-- Go, which the `go install` above runs on;
-- `owfeed`, installed the same way: `go install owfeed.org/owfeed/cmd/owfeed@latest`;
-- Node.js, then `npm ci` in the repo root, for `tools/`, `npm run changelog` and Playwright;
-  `npx playwright install chromium` fetches the browser `tools/e2e.mjs` drives;
-- `gh`, signed in, for `gh release download` in [verifying.md](verifying.md).
+| Tool | What it is for |
+|---|---|
+| Docker | The stand. |
+| Go | Runs the `go install` above. |
+| `owfeed` | Installed the same way: `go install owfeed.org/owfeed/cmd/owfeed@<OWFEED_VERSION>`. |
+| Node.js, then `npm ci` in the repo root | `tools/`, `npm run changelog` and Playwright. |
+| `npx playwright install chromium` | Fetches the browser `tools/e2e.mjs` drives. |
+| `gh`, signed in | `gh release download` in [verifying.md](verifying.md). |
 
 Everything else comes out of `owlab.yaml`.
 
-`owfeed` and `owlab` here follow the refs in `.github/workflows/build.yml`, which are the only pin
-(`owfeed version`, `owlab version` print what you have). A release binary from
-GitHub, checked with `gh attestation verify <file> -R owfeed/<tool>` and its `SHA256SUMS`, replaces
-the one in `~/go/bin`; `@latest` can run ahead of CI.
+### Versions follow the CI pin
 
-## The dev stand
+`owfeed` and `owlab` here follow the refs in `.github/workflows/build.yml`. Those refs are the only
+pin. `owfeed version` and `owlab version` print what you have.
+
+`@latest` can run ahead of CI, so install the pinned tag instead: the Go module tags match the
+action tags. A release binary from GitHub replaces the one in `~/go/bin`. Check it
+with `gh attestation verify <file> -R owfeed/<tool>` and its `SHA256SUMS`.
+
+## The dev stand runs real OpenWrt routers from owlab.yaml
 
 [owlab](https://github.com/owfeed/owlab) brings the stand up from `owlab.yaml` in the repo root.
-That file holds the current count and list of routers: read it rather than a number here. The two
-that matter for an ordinary change are the package-manager pair:
+That file holds the current count and list of routers: read it rather than a number here.
+
+The two that matter for an ordinary change are the package-manager pair:
 
 | id | distro | release | manager | LuCI |
 |---|---|---|---|---|
@@ -57,41 +145,68 @@ owlab sync --watch       # rebuild the CSS and push on every edit
 owlab open owrt2512      # open LuCI in a browser
 ```
 
-Log in as `root` with an empty password. Inside is the release's real userland (procd as PID 1,
-netifd, ubus, rpcd, uhttpd) from its own rootfs image, not a home-made imitation. `owlab.yaml` names
-the `ghcr.io/openwrt/rootfs` image for the two above; owlab finds `owrtsnap`'s itself.
+`owlab up owrt2512 owrt2410` starts only the pair. `owlab up` waits for LuCI before it returns,
+unless you pass `--no-wait`.
 
-- **Reach them only through `localhost:<port>`.** The docker bridge address routes from the host on
-  native Linux and inside WSL2, but not on Docker Desktop for macOS or Windows. So no command here
-  uses it, and the stand behaves identically on any OS.
-- **Rebuilding an image is a factory reset**: there are no volumes, so `owlab up --rebuild` wipes the
-  pushed theme and you re-run `owlab sync`. That is wanted: it exercises the install path for real,
-  on both package managers.
-- **There is no `curl` on them**, exactly as on a stock router. Run a curl snippet from the host
-  against `localhost:<port>`, not through `owlab exec`.
-- **owlab disables mwan3 and watchcat itself.** mwan3 decides the dummy WAN is dead and installs
-  `ip rule … blackhole`: LuCI answers while all outbound traffic hangs with no error.
-- `luci-theme-footstrap/dev-sync.sh [host]` pushes to a hardware router over ssh (default host
-  `router2512`), for when the question is about hardware: [Proving it on hardware](#proving-it-on-hardware).
+`owlab sync --watch` keeps running and re-syncs whenever a source file changes. Give it a terminal
+of its own.
+
+Log in as `root` with an empty password.
+
+Check that the stand is up and the theme is active:
+
+| Check | Expected |
+|---|---|
+| `owlab status` | Each router you started shows STATE `running` and its LUCI URL. |
+| `owlab exec owrt2512 -- uci get luci.main.mediaurlbase` after a sync | `/luci-static/footstrap`. Before a sync it is `/luci-static/bootstrap`. |
+| System → Footstrap in LuCI after a sync | The page exists and shows the version `dev`. |
+
+Inside is the release's real userland, not a home-made imitation. It runs from the release's own
+rootfs image: procd as PID 1, netifd, ubus, rpcd, uhttpd. `owlab.yaml` names the
+`ghcr.io/openwrt/rootfs` image for the two above. owlab finds `owrtsnap`'s itself.
+
+### Rules for working with the stand
+
+**Reach the routers only through `localhost:<port>`.**
+Why: the docker bridge address routes from the host on native Linux and inside WSL2. It does not on
+Docker Desktop for macOS or Windows. So no command here uses it, and the stand behaves identically
+on any OS.
+
+Rebuilding an image is a factory reset.
+Why: there are no volumes. `owlab up --rebuild` wipes the pushed theme, and you re-run `owlab sync`.
+That is wanted: it exercises the install path for real, on both package managers.
+
+Run a curl snippet from the host against `localhost:<port>`, not through `owlab exec`.
+Why: there is no `curl` on the routers, exactly as on a stock router.
+
+owlab disables mwan3 and watchcat itself.
+Why: mwan3 decides the dummy WAN is dead and installs `ip rule … blackhole`. LuCI then answers while
+all outbound traffic hangs with no error.
+
+For a hardware router, use `luci-theme-footstrap/dev-sync.sh [host]`. It pushes over ssh, default
+host `router2512`. It is for when the question is about hardware:
+[Proving it on hardware](#proving-it-on-hardware).
 
 ### ImmortalWrt stands (on demand)
 
-`imm2512`/`imm2410` are not a default-boot stand. The owlab config schema (`owlab up --help`) has
-no opt-in flag or profile for them: the only way to boot them is to give owlab a `routers:` entry
-to read. They are not an e2e target: `tools/lib/stands.mjs`'s `stands()` skips any router that is
-not openwrt. They answer a question about the ImmortalWrt brand, never a behaviour claim (the
-ImmortalWrt comment under `routers:` in `owlab.yaml`).
+`imm2512`/`imm2410` are not a default-boot stand. They answer a question about the ImmortalWrt
+brand, never a behaviour claim. The source is the ImmortalWrt comment under `routers:` in
+`owlab.yaml`.
 
-Bring one up only when that question is the one being asked. Paste both blocks back under
-`routers:` in `owlab.yaml`; they resolve `*third_party_apps` from the anchor already defined on
-`owrt2512` there. Then run:
+They are not an e2e target either. `tools/lib/stands.mjs`'s `stands()` skips any router that is not
+openwrt.
 
-```sh
-owlab up imm2512 imm2410
-```
+The owlab config schema (`owlab up --help`) has no opt-in flag or profile for them. The only way to
+boot them is to give owlab a `routers:` entry to read.
 
-When done, run `owlab down imm2512 imm2410` first, then remove the pasted blocks: owlab names a
-router only by an id it can read in `owlab.yaml`.
+Bring one up only when the brand question is the one being asked:
+
+1. Paste both blocks below back under `routers:` in `owlab.yaml`. They resolve `*third_party_apps`
+   from the anchor already defined on `owrt2512` there.
+2. Run `owlab up imm2512 imm2410`.
+3. When done, run `owlab down imm2512 imm2410` first.
+4. Then remove the pasted blocks. Why this order: owlab names a router only by an id it can read in
+   `owlab.yaml`.
 
 ```yaml
   - id: imm2512
@@ -107,7 +222,7 @@ router only by an id it can read in `owlab.yaml`.
     extra_packages: *third_party_apps
 ```
 
-## Pushing a change
+## Pushing a change with owlab sync
 
 ```sh
 owlab sync                    # to every router
@@ -115,81 +230,117 @@ owlab sync owrt2512           # to one
 owlab sync --watch            # and thereafter on every edit
 ```
 
-`sync` puts files exactly where `luci.mk` would and drops the same caches its postinst does. The
+`sync` puts files exactly where `luci.mk` would. It drops the same caches its postinst does. The
 steps are spelled out in `owlab.yaml`:
 
-- `build:` rebuilds `cascade.css` from `styles/` (`build-css.sh --dev`, comments intact) before every
-  push. Without it, everything is copied except the file LuCI requests, and the router 404s on its
-  own stylesheet;
-- `install:` maps the package directories onto router paths;
-- `post_sync:` registers the theme and touches the package database so the asset cache key moves
-  (see Caches below). It does this itself, not through `root/etc/uci-defaults/…`, because `sync`
-  deliberately does not overwrite `/etc/config` or `/etc/uci-defaults`: that is router state, not
-  package content;
-- `theme: footstrap` makes owlab set `luci.main.mediaurlbase` after the push. Installing the
-  package only registers the theme, which on a dev stand is the opposite of what you want.
+| Key | What it does | Why |
+|---|---|---|
+| `build:` | Rebuilds `cascade.css` from `styles/` (`build-css.sh --dev`, comments intact) before every push. | Without it, everything is copied except the file LuCI requests, and the router 404s on its own stylesheet. |
+| `install:` | Maps the package directories onto router paths. | |
+| `post_sync:` | Registers the theme and touches the package database, so the asset cache key moves ([Caches while iterating](#caches-while-iterating)). | It does this itself, not through `root/etc/uci-defaults/…`. `sync` deliberately does not overwrite `/etc/config` or `/etc/uci-defaults`: that is router state, not package content. |
+| `theme: footstrap` | Makes owlab set `luci.main.mediaurlbase` after the push. | Installing the package only registers the theme. On a dev stand that is the opposite of what you want. |
 
-Resource JS is copied by glob (all of `htdocs/`), never by a list of names. LuCI's `luci.mk` copies
-`htdocs/` wholesale, so a list would let a new file reach the package but never the dev router.
+Resource JS is copied by glob (all of `htdocs/`), never by a list of names.
+Why: LuCI's `luci.mk` copies `htdocs/` wholesale. A list would let a new file reach the package but
+never the dev router.
 
-What `sync` does not do: stamp `FS_VERSION` (System → Footstrap shows `dev`) and compile
-`po/*.po` into `.lmo` (strings stay English). Both belong to a real package build, which is where
-they should be verified.
+### What sync does not do
 
-## If you break it
+`sync` skips two steps of a real package build:
 
-- **A broken template does not brick the UI.** If `header.ut` does not compile, LuCI falls back to
-  the first working theme in `luci.themes` and shows a "Theme fallback" indicator carrying the error.
-- Manual rollback at any time:
-  ```sh
-  owlab exec owrt2512 -- 'uci set luci.main.mediaurlbase=/luci-static/bootstrap && uci commit luci'
-  ```
-- If everything is broken: `uci` is reachable over ssh, and LuCI is not needed to recover.
+- It does not stamp `FS_VERSION`, so System → Footstrap shows `dev`.
+- It does not compile `po/*.po` into `.lmo`, so strings stay English.
+
+Both belong to a real package build, which is where they should be verified.
+
+## If you break it, LuCI falls back and uci recovers
+
+A broken template does not brick the UI. If `header.ut` does not compile, LuCI falls back to the
+first working theme in `luci.themes`. It shows a "Theme fallback" indicator carrying the error.
+
+Roll back by hand at any time:
+
+```sh
+owlab exec owrt2512 -- 'uci set luci.main.mediaurlbase=/luci-static/bootstrap && uci commit luci'
+```
+
+To switch back to footstrap, run `owlab sync owrt2512`. Its `theme: footstrap` sets
+`luci.main.mediaurlbase` again. By hand:
+
+```sh
+owlab exec owrt2512 -- 'uci set luci.main.mediaurlbase=/luci-static/footstrap && uci commit luci'
+```
+
+If everything is broken, `uci` is reachable over ssh. LuCI is not needed to recover.
 
 ## Caches while iterating
 
-- The menu and dispatcher are cached in `/tmp/luci-indexcache.<hash>.json`. The hash comes from
-  menu-file mtimes, so it updates itself. If things look strange, clear it:
-  `owlab exec owrt2512 -- 'rm -f /tmp/luci-indexcache*'`.
-- `.ut` templates are not cached between requests (ucode compiles on the fly): an edit to
-  `header.ut` is visible on F5.
-- CSS/JS are cached by the browser. `cascade.css` is served with `?v={{ pkgs_update_time }}`, so
-  touching the package database changes the key and an ordinary F5 picks the file up. `post_sync:`
-  does this on every sync. By hand, touch both, because which file that is depends on the release:
-  ```sh
-  owlab exec owrt2512 -- 'for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f "$db" ] && touch "$db"; done'
-  ```
-  Name only the apk path, and the key never changes on 24.10. The file arrives, the browser serves
-  the old one, and it looks exactly like an edit that did nothing.
+| What | Cached where | How an edit shows up |
+|---|---|---|
+| Menu and dispatcher | `/tmp/luci-indexcache.<hash>.json` | The hash comes from menu-file mtimes, so it updates itself. |
+| `.ut` templates | Not cached between requests: ucode compiles on the fly. | An edit to `header.ut` is visible on F5. |
+| CSS/JS | The browser | `cascade.css` is served with `?v={{ pkgs_update_time }}`. Touching the package database changes the key, and an ordinary F5 picks the file up. `post_sync:` does this on every sync. |
 
-## Verifying a change
+If things look strange, clear the menu cache:
+`owlab exec owrt2512 -- 'rm -f /tmp/luci-indexcache*'`.
 
-**A template**, with the same `trycompile` LuCI uses:
+To move the CSS/JS key by hand, touch both package databases. Which file exists depends on the
+release:
+
+```sh
+owlab exec owrt2512 -- 'for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f "$db" ] && touch "$db"; done'
+```
+
+**Name only the apk path, and the key never changes on 24.10.** The file arrives, but the browser
+serves the old one. It looks exactly like an edit that did nothing.
+
+## Verifying a change: templates, CSS, behaviour
+
+### What proves what
+
+| Proof | What it proves | What it does not prove |
+|---|---|---|
+| Computed-style diff ([css.md, "Proving a CSS change"](css.md#proving-a-css-change)) | A CSS change does what you meant, and nothing else moved. There is no script: drive it with Playwright. | The chrome: the gallery has no `header.ut`, so check the sidebar, bar, rail or menu on a router. |
+| `tools/e2e.mjs` | The package installs, upgrades, removes and reinstalls; every menu page renders with no new JS error or failed request; the shell is intact. | How a page looks. |
+| `tools/anchor-check.mjs` | A poll tick above a parked reader leaves them in place. | How a page looks. |
+| Looking by hand on both routers | A layout, a fold, an axis. | |
+
+A CSS change needs the computed-style diff and a look by hand. It also needs a green e2e and anchor
+run on both routers, like every change.
+
+### How to prove each kind of change
+
+| What changed | How to prove it |
+|---|---|
+| A template | Compile it with the same `trycompile` LuCI uses (command below). |
+| CSS | Diff computed styles, each sheet in its own document: [css.md, "Proving a CSS change"](css.md#proving-a-css-change). |
+| Behaviour | On a router, with `tools/e2e.mjs` and `tools/anchor-check.mjs` ([Proving it on a router](#proving-it-on-a-router)). By hand on a synced stand for what they do not judge: a layout, a fold, an axis. |
 
 ```sh
 owlab exec owrt2512 -- 'ucode -T -c -o /dev/null \
   /usr/share/ucode/luci/template/themes/footstrap/header.ut'
 ```
 
-**CSS**, by diffing computed styles, each sheet in its own document:
-[css.md, "Proving a CSS change"](css.md#proving-a-css-change). Screenshots do not prove it: live
-counters (uptime, DHCP leases, wifi signal) move more pixels between two runs of the *same*
-stylesheet than a real regression does.
+Screenshots do not prove a CSS change.
+Why: live counters (uptime, DHCP leases, wifi signal) move more pixels between two runs of the
+*same* stylesheet than a real regression does.
 
-**Behaviour**: on a router, with `tools/e2e.mjs` and `tools/anchor-check.mjs` (next section), and
-by hand on a synced stand for what they do not judge: a layout, a fold, an axis.
+`build-css.sh` also fails on unbalanced braces or a changed rule count.
 
-`build-css.sh` additionally fails on unbalanced braces or a changed rule count.
-
-No npm package is installed on a router, but the release build (`tools/stage.sh`) runs uglify-js and
+No npm package is installed on a router. The release build (`tools/stage.sh`) runs uglify-js and
 acorn from `package.json` over the shipped JS and templates. The OpenWrt buildbot has no node, so
 the Makefile path uses none of it.
 
 ## Proving it on a router
 
-Two checks run on a real router: `tools/e2e.mjs` (the package's life and every menu page) and
-`tools/anchor-check.mjs` (scroll anchoring). They are the local form of CI's `e2e` and `anchor`
-jobs. What they prove, how to run them and their exit codes: [verifying.md](verifying.md).
+Two checks run on a real router. They are the local form of CI's `e2e` and `anchor` jobs:
+
+| Check | What it covers |
+|---|---|
+| `tools/e2e.mjs` | The package's life and every menu page. |
+| `tools/anchor-check.mjs` | Scroll anchoring. |
+
+What they prove, how to run them and their exit codes: [verifying.md](verifying.md).
 
 For anything the checks do not judge (a layout change, a fold, an axis), drive the running
 container by hand:
@@ -202,18 +353,22 @@ owlab open owrt2410            # and again on the other package manager
 
 ### The routers are pre-populated, and that is what makes them useful
 
-`owlab.yaml` sets `fixtures: [all]`, so each box comes up with seeded networks, clients, wireguard
+`owlab.yaml` sets `fixtures: [all]`. Each box comes up with seeded networks, clients, wireguard
 peers, port forwards, system data and wireless config. The wireless pages render from UCI with no
 radios present, and this theme has to style them.
 
-It also adds a long `packages:` list on top of owlab's stock set, every entry prefixed with `+` so it
-adds rather than replaces. That list is the theme's test surface: a stock router renders a
-handful of menus, while the sections, tabs, tables and widgets that need styling live in the apps.
-`curl` is deliberately absent: it is not in OpenWrt's default set, and installing it here would
-hide the bug class `install.sh`'s `uclient-fetch` fallback exists for.
+`owlab.yaml` also adds a long `packages:` list on top of owlab's stock set. Every entry is prefixed
+with `+`, so it adds rather than replaces.
 
-If a change needs a real kernel (not this theme's usual case), a router can be raised to
-`fidelity: vm`, which runs it under QEMU instead of in a container.
+That list is the theme's test surface. A stock router renders a handful of menus. The sections,
+tabs, tables and widgets that need styling live in the apps.
+
+`curl` is deliberately absent from the list.
+Why: it is not in OpenWrt's default set. Installing it here would hide the bug class that
+`install.sh`'s `uclient-fetch` fallback exists for.
+
+If a change needs a real kernel (not this theme's usual case), raise a router to `fidelity: vm`. It
+then runs under QEMU instead of in a container.
 
 ### Proving it on hardware
 
@@ -222,23 +377,32 @@ run happens on the maintainer's explicit word for one change, never by reflex.
 
 1. Pre-check that the fallback exists, and record where the router is now:
    `ssh <host> 'ls -d /www/luci-static/bootstrap /usr/share/ucode/luci/template/themes/bootstrap/header.ut && uci get luci.main.mediaurlbase'`.
-   Either path missing: stop. A broken template falls back to the first working theme in
-   `luci.themes`, and with no bootstrap on the box there is nothing to fall back to.
+   If either path is missing, stop. A broken template falls back to the first working theme in
+   `luci.themes`. With no bootstrap on the box there is nothing to fall back to.
 2. Run `luci-theme-footstrap/dev-sync.sh <host>`. It registers the theme, activates nothing and
    busts the asset cache. It keeps no backup: the rollback is uci.
 3. Sweep the templates the way LuCI will:
    `ssh <host> 'for f in /usr/share/ucode/luci/template/themes/footstrap/*.ut /usr/share/ucode/luci/template/themes/footstrap/partials/*.ut; do ucode -T -c -o /dev/null "$f" || echo FAIL $f; done'`.
-4. Run `curl -s -D - http://<host>/cgi-bin/luci/`: the body is the login form. 25.12 answers it with
-   403 and `x-luci-login-required: yes` (upstream `dispatcher.uc`, not the theme), so read the body,
-   not the code. The admin pages are clicked by a person.
-5. Rollback, if anything above fails or a page is wrong:
+   Expected: no `FAIL` line.
+4. Run `curl -s -D - http://<host>/cgi-bin/luci/`. Expected: the body is the login form.
+   25.12 answers it with 403 and `x-luci-login-required: yes`. That comes from upstream
+   `dispatcher.uc`, not the theme, so read the body, not the code.
+5. A person clicks through the admin pages.
+6. If anything above fails or a page is wrong, roll back:
    `ssh <host> 'uci set luci.main.mediaurlbase=/luci-static/bootstrap; uci commit luci; rm -f /tmp/luci-indexcache*'`.
 
 ### The playground: recording and replaying a real router
 
 `tools/playground/{capture,build,verify}.mjs` turn an owlab stand into a static, offline site. CI's
-`playground` job runs them ([ci.md](ci.md)). Each step needs the one before it (`capture` needs a booted,
-installed router; `build` needs `capture`'s output; `verify` needs `build`'s).
+`playground` job runs them ([ci.md](ci.md)).
+
+Each step needs the one before it:
+
+| Step | Needs |
+|---|---|
+| `capture` | A booted, installed router. |
+| `build` | `capture`'s output. |
+| `verify` | `build`'s output. |
 
 ```sh
 owlab up owrt2512 && owlab install owrt2512 'dist/noarch/luci-theme-footstrap-*.apk'
@@ -247,204 +411,309 @@ npm run playground:capture &&
   npm run playground:verify -- --base /luci-theme-footstrap/playground
 ```
 
-Each script also takes its own flags directly (`--recording DIR`, `--out DIR`, `--base /path`).
-`--help` on each prints the exact list. Output lands under `../tmp/playground/` by default
-(`recording/`, `out/`, `playground.tar.gz`), never inside the checkout. Open
-`../tmp/playground/out/cgi-bin/luci/admin/status/overview/index.html` in a browser under any static
-server rooted at `--base` to look at what was built.
+Each script also takes its own flags directly: `--recording DIR`, `--out DIR`, `--base /path`.
+`--help` on each prints the exact list.
 
-The site opens on a login page (`BASE/cgi-bin/luci/`, prefilled `root`/empty like a real router).
-It accepts any credentials, because a static site has no server left to check them against.
-`.fs-logout` returns to it. `build.mjs` refuses a `--recording` that has no saved login form and
-asks for a re-capture.
+Output lands under `../tmp/playground/` by default, never inside the checkout. It holds
+`recording/`, `out/` and `playground.tar.gz`.
 
-Two harness facts hold behind `tools/lib/stands.mjs`, which `capture` reads the stand through:
+To look at what was built, open
+`../tmp/playground/out/cgi-bin/luci/admin/status/overview/index.html` in a browser. Serve it with
+any static server rooted at `--base`.
 
-- **`sealToRouter()` aborts every request that leaves the router's origin** (data:/blob: pass). A
-  run then stops depending on github.com and its rate limit; ssclash asks GitHub for a release on
-  two pages. Playwright turns the predicate into a catch-all glob, so every request passes through
-  a JS callback and the browser's HTTP cache is off; that costs little at capture's one page at a
-  time. `tools/e2e.mjs`, which loads hundreds of pages, seals its browser with a launch proxy
-  instead (`proxy: { server: 'http://127.0.0.1:9', bypass: 'localhost' }`): every other host is
-  refused at once, and the cache stays on. The route aborts rather than faking a 200, which the
-  page would render.
-- **`menuPaths()` waits for `window.L.require` before asking for `ui`:** `L.ui` exists only once
-  something has required ui.js, which on 24.10 is not yet the case straight after the login
-  redirect. The tree arrives rooted at `admin`, so the walk starts with an empty path (seeding
-  `admin` yields `/admin/admin/...`, a sweep of 404s that reads as a clean run). The tree has 30 s
-  to load: `L.Request` has no clock, and a stand that stopped answering while the menu loaded held
-  the caller to its step's timeout. A timeout is a `StandDown` only when LuCI's root then stays
-  silent for a minute (`stoodDown()`), else an error the caller judges.
+#### The playground login accepts any credentials
+
+The site opens on a login page: `BASE/cgi-bin/luci/`, prefilled `root`/empty like a real router. It
+accepts any credentials, because a static site has no server left to check them against.
+`.fs-logout` returns to it.
+
+`build.mjs` refuses a `--recording` that has no saved login form and asks for a re-capture.
+
+#### Two harness facts behind `tools/lib/stands.mjs`
+
+`capture` reads the stand through `tools/lib/stands.mjs`. Two facts hold there.
+
+**`sealToRouter()` aborts every request that leaves the router's origin.** data:/blob: requests
+pass.
+
+- A run then stops depending on github.com and its rate limit. ssclash asks GitHub for a release on
+  two pages.
+- Playwright turns the predicate into a catch-all glob. Every request then passes through a JS
+  callback, and the browser's HTTP cache is off. That costs little at capture's one page at a time.
+- `tools/e2e.mjs` loads hundreds of pages, so it seals its browser with a launch proxy instead:
+  `proxy: { server: 'http://127.0.0.1:9', bypass: 'localhost' }`. Every other host is refused at
+  once, and the cache stays on.
+- The route aborts rather than faking a 200, which the page would render.
+
+`menuPaths()` waits for `window.L.require` before asking for `ui`.
+
+- Why: `L.ui` exists only once something has required ui.js. On 24.10 that is not yet the case
+  straight after the login redirect.
+- The tree arrives rooted at `admin`, so the walk starts with an empty path. Seeding `admin` yields
+  `/admin/admin/...`: a sweep of 404s that reads as a clean run.
+- The tree has 30 s to load. `L.Request` has no clock. A stand that stopped answering while the menu
+  loaded used to hold the caller to its step's timeout.
+- A timeout is a `StandDown` only when LuCI's root then stays silent for a minute (`stoodDown()`).
+  Otherwise it is an error the caller judges.
 
 ## The stand's own traps
 
-- **A stand after `owlab up` carries no theme until `owlab sync`.** `up` starts the containers
-  and leaves `luci.main.mediaurlbase` at `/luci-static/bootstrap`; `--rebuild` is a factory reset.
-  Every page then logs `NetworkError: HTTP error 404 while loading class file
-  "/luci-static/resources/fs-prefs.js"`, or a measurement silently reads stock bootstrap. Tell it
-  apart: `owlab exec <stand> -- uci get luci.main.mediaurlbase`. Run `owlab sync` before measuring
-  the working tree. Do not sync before `tools/e2e.mjs`, which wants the router without the theme.
+Each trap below makes a measurement lie. Read the heading, then the check that tells it apart.
 
-- **A synced stand has no `/etc/footstrap`, so an Appearance upload (pattern or login background)
-  fails "No such file or directory".** A sync does not create it. `owlab sync` never writes
-  `/etc/config` and never runs `root/etc/uci-defaults/…`, which makes the directory; `post_sync:`
-  only registers the theme. A packaged install has both. Tell it apart: `owlab exec <stand> -- ls -d /etc/footstrap
-  /etc/config/footstrap`. Fix with `owlab exec <stand> -- mkdir -p /etc/footstrap` and a `docker cp` of
-  `luci-theme-footstrap/root/etc/config/footstrap` to `/etc/config/footstrap` (then `chown 0:0`).
+### A stand after `owlab up` carries no theme until `owlab sync`
 
-- **`owlab sync` does not ship what a router gets.** It copies `htdocs/` and `ucode/` straight from
-  the checkout and builds `cascade.css` with `--dev`: no minifier, no pre-paint minifier, no template
-  strip, no token mangle. Anything touching the build pipeline has to be measured on a package:
-  `./tools/stage.sh && owfeed build`, then install. On a packaged build
+`up` starts the containers and leaves `luci.main.mediaurlbase` at `/luci-static/bootstrap`.
+`--rebuild` is a factory reset.
+
+- Symptom: every page logs `NetworkError: HTTP error 404 while loading class file
+  "/luci-static/resources/fs-prefs.js"`. Or a measurement silently reads stock bootstrap.
+- Tell it apart: `owlab exec <stand> -- uci get luci.main.mediaurlbase`.
+- Fix: run `owlab sync` before measuring the working tree.
+- Exception: do not sync before `tools/e2e.mjs`, which wants the router without the theme.
+
+### A synced stand has no `/etc/footstrap`, so an Appearance upload fails
+
+- Symptom: an Appearance upload (pattern or login background) fails "No such file or directory".
+- Cause: a sync does not create the directory. `owlab sync` never writes `/etc/config` and never
+  runs `root/etc/uci-defaults/…`, which makes it. `post_sync:` only registers the theme. A packaged
+  install has both.
+- Tell it apart: `owlab exec <stand> -- ls -d /etc/footstrap /etc/config/footstrap`.
+- Fix: run `owlab exec <stand> -- mkdir -p /etc/footstrap`. Then `docker cp`
+  `luci-theme-footstrap/root/etc/config/footstrap` to `/etc/config/footstrap`, then `chown 0:0` it.
+
+### `owlab sync` does not ship what a router gets
+
+`owlab sync` copies `htdocs/` and `ucode/` straight from the checkout. It builds `cascade.css` with
+`--dev`: no minifier, no pre-paint minifier, no template strip, no token mangle.
+
+- Rule: anything touching the build pipeline is measured on a package. Run
+  `./tools/stage.sh && owfeed build`, then install.
+- Sign: on a packaged build
   `getComputedStyle(document.documentElement).getPropertyValue('--fs-accent')` comes back empty,
   because the name is mangled there.
 
-- **opkg does not reinstall a package whose version already matches.** On 24.10 `owlab install`
-  answers `… is up to date.` and leaves the previous files in place, while apk reinstalls. Prove the
-  bytes arrived (`md5sum dist/root/www/luci-static/resources/fs-fit.js` against `owlab exec owrt2410
-  -- md5sum /www/luci-static/resources/fs-fit.js`); when they differ, force it:
+### opkg does not reinstall a package whose version already matches
 
-  ```sh
-  docker cp dist/all/*.ipk owlab-luci-theme-footstrap-owrt2410:/tmp/theme.ipk
-  docker exec owlab-luci-theme-footstrap-owrt2410 opkg install --force-reinstall /tmp/theme.ipk
-  owlab exec owrt2410 -- 'uci set luci.main.mediaurlbase=/luci-static/footstrap && uci commit luci'
-  ```
+On 24.10 `owlab install` answers `… is up to date.` and leaves the previous files in place. apk
+reinstalls.
 
-  The last line is needed because a forced reinstall runs postrm, which hands
-  `luci.main.mediaurlbase` to bootstrap exactly as [package.md](package.md) requires.
+1. Prove the bytes arrived. Compare `md5sum dist/root/www/luci-static/resources/fs-fit.js` with
+   `owlab exec owrt2410 -- md5sum /www/luci-static/resources/fs-fit.js`.
+2. When they differ, force the reinstall:
 
-- **A file put in with `docker cp` is served 403.** It lands without world-read. A file copied from
-  a path owned by uid 1000 also keeps that owner. Then uhttpd answers 403 and the page reports
-  `NetworkError: HTTP error 403 while loading class file`: the module never runs, and the page can
-  look fixed. `chmod 644` and `chown 0:0` it inside the container.
+   ```sh
+   docker cp dist/all/*.ipk owlab-luci-theme-footstrap-owrt2410:/tmp/theme.ipk
+   docker exec owlab-luci-theme-footstrap-owrt2410 opkg install --force-reinstall /tmp/theme.ipk
+   owlab exec owrt2410 -- 'uci set luci.main.mediaurlbase=/luci-static/footstrap && uci commit luci'
+   ```
 
-- **A local stand keeps the packages it was built with; CI boots today's feed.** `owlab up` without
-  `--rebuild` reuses the container. Tell it apart: the CI job log prints every installed version;
-  `docker exec owlab-luci-theme-footstrap-<stand> apk version -l '<'` (`opkg list-upgradable` on
-  24.10) lists what the feed has moved past. Reproduce in isolation: copy `owlab.yaml` with its own
-  `project.name`, then `OWLAB_CONFIG=<copy> owlab up --rebuild <stand>`; the real stands stay
-  untouched.
+The last line is needed because a forced reinstall runs postrm. postrm hands
+`luci.main.mediaurlbase` to bootstrap, exactly as [package.md](package.md) requires.
 
-- **Nothing locks a stand.** Two runs against one router invent findings: one run's theme switch
-  or install lands in the middle of the other's measurement. Run one `tools/e2e.mjs` or playground
-  capture per router at a time, and no `owlab sync` while a run is reading it.
+### A file put in with `docker cp` is served 403
 
-- **`owlab test` run from the checkout removes the project's running stands.** Containers are
-  named after the working directory, so run it from a scratch directory (`mkdir -p ../tmp/owlab-test && cd ../tmp/owlab-test`), or `owlab up`
-  again afterwards.
+- Cause: it lands without world-read. A file copied from a path owned by uid 1000 also keeps that
+  owner. Then uhttpd answers 403.
+- Symptom: the page reports `NetworkError: HTTP error 403 while loading class file`. The module never
+  runs, and the page can look fixed.
+- Fix: `chmod 644` and `chown 0:0` it inside the container.
 
-- **`owlab up` reports one failed router as a failed command.** It exits non-zero while other
-  routers came up. Two causes are common: a taken host port (`Bind for 0.0.0.0:<port> failed: port
-  is already allocated`) and an image build that dies on opkg index drift (`Checksum or size
-  mismatch for package …`). A failing image build also cancels the other legs of the same build.
-  Read the per-router lines, not the exit status. Do not take running stands down while `up` is
-  failing this way: there is no volume to recover from.
+### A local stand keeps the packages it was built with; CI boots today's feed
 
-- **`defaults.extra_packages` in `owlab.yaml` reaches every router.** A package one of them cannot
-  resolve fails `owlab up` for all of them. The list merges additively, with no way to opt a router
-  out. The openclash and ssclash apps need `kmod-tun`, which `owrtsnap` often cannot resolve (its kmods
-  index is keyed to the box's exact kernel hash). That is why the apps are declared once on a release
-  router and aliased onto the others, with `owrtsnap` carrying none.
+`owlab up` without `--rebuild` reuses the container.
 
-- **A package can be missing on `owrtsnap` on any given day.** The snapshot index of `feeds/luci`
-  and `feeds/packages` move independently, so a `luci-app-*` and its binary can briefly disagree.
-  Before treating a snapshot-only difference in section or DOM count as a theme finding, check what
-  is missing today: `grep 'unable to select' /var/log/apk.log` on `owrtsnap`.
+- Tell it apart: the CI job log prints every installed version.
+  `docker exec owlab-luci-theme-footstrap-<stand> apk version -l '<'` lists what the feed has moved
+  past. On 24.10 use `opkg list-upgradable`.
+- Reproduce in isolation: copy `owlab.yaml` with its own `project.name`. Then run
+  `OWLAB_CONFIG=<copy> owlab up --rebuild <stand>`. The real stands stay untouched.
 
-- **A snapshot stand can answer 502 because its ucode and luci-base come from different days.**
-  `logread` carries `Error relocating /usr/lib/ucode/html.so: … symbol not found`, and every page
-  fails as not answering. Check `curl -s -o /dev/null -w '%{http_code}' localhost:8022/cgi-bin/luci/`
-  and `logread | grep relocating` before reading a snapshot finding; recreate the stand
-  (`owlab up --rebuild owrtsnap`).
+### Nothing locks a stand
 
-- **`ucode` is not on the host; it lives in a stand.** Run the template check where LuCI runs
-  (`owlab exec <stand> -- ucode -T -c -o /dev/null <file>.ut`, after a sync or a `docker cp`).
+Two runs against one router invent findings. One run's theme switch or install lands in the middle
+of the other's measurement.
 
-- **A stand serves http only, so the login page's https hop cannot be measured on it as it comes.**
-  `uhttpd` has the certificate. What is missing is the listener: owlab publishes port 80 alone.
-  Reach the https side on the container's own address:
+- Run one `tools/e2e.mjs` or playground capture per router at a time.
+- Run no `owlab sync` while a run is reading it.
 
-  ```sh
-  docker exec owlab-luci-theme-footstrap-owrt2512 sh -c \
-      "uci set uhttpd.main.listen_https='0.0.0.0:443'; uci commit uhttpd; /etc/init.d/uhttpd restart"
-  docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
-      owlab-luci-theme-footstrap-owrt2512      # -> curl -k https://<ip>/cgi-bin/luci
-  ```
+### `owlab test` run from the checkout removes the project's running stands
 
-  Put it back with `uci delete uhttpd.main.listen_https`.
+Containers are named after the working directory. Run it from a scratch directory
+(`mkdir -p ../tmp/owlab-test && cd ../tmp/owlab-test`), or run `owlab up` again afterwards.
 
-- **A control gated on `/proc/mtd` or the overlay mount line is absent on a stand, under any
-  theme.** Take luci-mod-system's flash page (`view/system/flash.js`). It adds "Reset to defaults"
-  only when `/proc/mtd` names `rootfs_data` or `/proc/mounts` carries `overlayfs:/overlay / `. Both
-  reads degrade to an empty string through `fs.trimmed()`. A container has neither, so the button is
-  missing under footstrap AND under bootstrap: switch to bootstrap first. To see the control, feed
-  the data by intercepting the ubus reply:
+### `owlab up` reports one failed router as a failed command
 
-  ```js
-  // playwright, on the context: the endpoint is /ubus/, the body a batched JSON-RPC array
-  await ctx.route('**/ubus/**', async route => {
-      const body = JSON.parse(route.request().postData() || '[]');
-      const ids = new Set(body.filter(i => i.params?.[1] === 'file' && i.params?.[2] === 'read'
-          && i.params?.[3]?.path === '/proc/mounts').map(i => i.id));
-      if (!ids.size) return route.continue();
-      const response = await route.fetch(), json = await response.json();
-      for (const i of json) if (ids.has(i.id) && typeof i.result?.[1]?.data === 'string')
-          i.result[1].data += '\noverlayfs:/overlay / overlay rw,noatime,lowerdir=/,'
-              + 'upperdir=/overlay/upper,workdir=/overlay/work 0 0\n';
-      await route.fulfill({ response, json });
-  });
-  ```
+It exits non-zero while other routers came up. Read the per-router lines, not the exit status.
 
-- **`RPC call to uci/get failed with error -32002: Access denied` on the login document is upstream
-  LuCI.** The `luci.js` boot requires `form`. On the openwrt-24.10 and openwrt-25.12 branches,
+Two causes are common:
+
+| Cause | Message |
+|---|---|
+| A taken host port | `Bind for 0.0.0.0:<port> failed: port is already allocated` |
+| An image build that dies on opkg index drift | `Checksum or size mismatch for package …` |
+
+A failing image build also cancels the other legs of the same build.
+
+`owrtsnap`'s ssh port is 2228, not 2222. 2222 is the port a developer machine's own sshd usually
+listens on, and docker refuses the bind (`owlab.yaml`).
+
+Do not take running stands down while `up` is failing this way. There is no volume to recover from.
+
+### `defaults.extra_packages` in `owlab.yaml` reaches every router
+
+A package one router cannot resolve fails `owlab up` for all of them. The list merges additively,
+with no way to opt a router out.
+
+The openclash and ssclash apps need `kmod-tun`, which `owrtsnap` often cannot resolve. Its kmods
+index is keyed to the box's exact kernel hash.
+
+That is why the apps are declared once on a release router and aliased onto the others.
+`owrtsnap` carries none.
+
+### A package can be missing on `owrtsnap` on any given day
+
+The snapshot indexes of `feeds/luci` and `feeds/packages` move independently. A `luci-app-*` and its
+binary can briefly disagree.
+
+Before treating a snapshot-only difference in section or DOM count as a theme finding, check what is
+missing today: `grep 'unable to select' /var/log/apk.log` on `owrtsnap`.
+
+### A snapshot stand can answer 502 when its ucode and luci-base come from different days
+
+- Symptom: `logread` carries `Error relocating /usr/lib/ucode/html.so: … symbol not found`. Every
+  page fails as not answering.
+- Check before reading a snapshot finding:
+  `curl -s -o /dev/null -w '%{http_code}' localhost:8022/cgi-bin/luci/` and
+  `logread | grep relocating`.
+- Fix: recreate the stand (`owlab up --rebuild owrtsnap`).
+
+### `ucode` is not on the host; it lives in a stand
+
+Run the template check where LuCI runs, after a sync or a `docker cp`:
+`owlab exec <stand> -- ucode -T -c -o /dev/null <file>.ut`.
+
+### A stand serves http only, so the login page's https hop cannot be measured as it comes
+
+`uhttpd` has the certificate. What is missing is the listener: owlab publishes port 80 alone.
+
+Reach the https side on the container's own address:
+
+```sh
+docker exec owlab-luci-theme-footstrap-owrt2512 sh -c \
+    "uci set uhttpd.main.listen_https='0.0.0.0:443'; uci commit uhttpd; /etc/init.d/uhttpd restart"
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+    owlab-luci-theme-footstrap-owrt2512      # -> curl -k https://<ip>/cgi-bin/luci
+```
+
+Put it back with `uci delete uhttpd.main.listen_https`.
+
+### A control gated on /proc/mtd or the overlay mount is absent on a stand, under any theme
+
+Take luci-mod-system's flash page (`view/system/flash.js`). It adds "Reset to defaults" only when
+`/proc/mtd` names `rootfs_data` or `/proc/mounts` carries `overlayfs:/overlay / `.
+
+Both reads degrade to an empty string through `fs.trimmed()`. A container has neither, so the button
+is missing under footstrap and under bootstrap. Switch to bootstrap first to confirm.
+
+To see the control, feed the data by intercepting the ubus reply:
+
+```js
+// playwright, on the context: the endpoint is /ubus/, the body a batched JSON-RPC array
+await ctx.route('**/ubus/**', async route => {
+    const body = JSON.parse(route.request().postData() || '[]');
+    const ids = new Set(body.filter(i => i.params?.[1] === 'file' && i.params?.[2] === 'read'
+        && i.params?.[3]?.path === '/proc/mounts').map(i => i.id));
+    if (!ids.size) return route.continue();
+    const response = await route.fetch(), json = await response.json();
+    for (const i of json) if (ids.has(i.id) && typeof i.result?.[1]?.data === 'string')
+        i.result[1].data += '\noverlayfs:/overlay / overlay rw,noatime,lowerdir=/,'
+            + 'upperdir=/overlay/upper,workdir=/overlay/work 0 0\n';
+    await route.fulfill({ response, json });
+});
+```
+
+### "Access denied" from uci/get on the login document is upstream LuCI
+
+The message is `RPC call to uci/get failed with error -32002: Access denied`.
+
+- Cause: the `luci.js` boot requires `form`. On the openwrt-24.10 and openwrt-25.12 branches,
   `form.js` runs `uci.loadPackage('luci').catch();`. That `.catch()` has no handler, so the
-  anonymous session's denial goes unhandled (master has `.catch(() => {})`). It shows under stock
-  bootstrap too, at a different rate. To tell it apart, switch `luci.main.mediaurlbase` to
-  `/luci-static/bootstrap` and rerun.
+  anonymous session's denial goes unhandled. master has `.catch(() => {})`.
+- It shows under stock bootstrap too, at a different rate.
+- Tell it apart: switch `luci.main.mediaurlbase` to `/luci-static/bootstrap` and rerun.
 
-- **"It is the app's markup" is a claim; switching the stand to bootstrap checks it.** Re-measure
-  the same page at the same width under `/luci-static/bootstrap`. An overflow that looks like the
-  app's markup can come from this theme's own wider buttons. This is also why `tools/e2e.mjs`
-  judges every page against bootstrap on the same router.
+### "It is the app's markup" is a claim; switching the stand to bootstrap checks it
 
-- **When `tools/e2e.mjs` goes red, build the parent commit.** Package it, install it the same way,
-  run the same check. A failure that reproduces there did not come from the change under test.
+Re-measure the same page at the same width under `/luci-static/bootstrap`.
 
-- **A `<style>` injected into a live page is eaten by the theme's own fence.** The fence is
-  `fs-sheets.js`. It observes a new `<style>` in `<head>`. If the sheet is invasive (a selector
-  not pinned to a name the theme does not style), it re-hosts it into `@layer theme` and scopes its
-  selectors to the current view. A rule aimed at the chrome then matches nothing. Inject
-  through a constructed sheet, which is not a DOM node:
+Why: an overflow that looks like the app's markup can come from this theme's own wider buttons. This
+is also why `tools/e2e.mjs` judges every page against bootstrap on the same router.
 
-  ```js
-  const s = new CSSStyleSheet(); s.replaceSync('* { box-shadow: none !important }');
-  document.adoptedStyleSheets = [...document.adoptedStyleSheets, s];
-  ```
+### When `tools/e2e.mjs` goes red, build the parent commit
 
-- **A page-scoped rule cannot be read off the gallery.** No element in `docs/gallery.html`
-  carries `data-page`, its `#view` included, so a rule written
-  `:where(#view)[data-page="admin-status-overview"] …` matches nothing there. Take the reading off the playground or a stand.
+1. Package the parent commit.
+2. Install it the same way.
+3. Run the same check.
 
-- **A leftover `dist/` can carry a version it is not.** A size comparison against a stale build
-  moves in the wrong direction. Build the baseline fresh from the tag:
-  `git archive <tag> | tar -x -C /clean/checkout && (cd /clean/checkout && ./tools/stage.sh)`.
+A failure that reproduces there did not come from the change under test.
 
-- **A hardware test build versioned `X.Y.Z_pN` never gives way to the release.** On apk `_p` is a
-  patch level. It sorts ABOVE `X.Y.Z`: `apk version -t 0.14.15_rc1 0.14.15` → `<`, `0.14.15_p1` →
-  `>`. opkg sorts both `_rc1` and `_p1` above the release and only `0.14.15~rc1` below, which apk
-  rejects. So stamp an apk test build as the next version's candidate
-  (`FOOTSTRAP_VERSION=0.14.16_rc1` over 0.14.15); an opkg test build needs
-  `opkg install --force-downgrade` back to the release.
+### A `<style>` injected into a live page is eaten by the theme's own fence
 
-## The test matrix
+The fence is `fs-sheets.js`. It observes a new `<style>` in `<head>`.
 
-- **Pages**: Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals),
-  Network/Firewall (section table, dropdown), System/Software (progress), Realtime graphs (SVG),
-  login/logout, Reboot. Plus the apply/rollback confirmation sheet, which `ui.js` draws over the
-  theme and which custom z-indexes often break.
-- **Modes**: light/dark/auto, both layouts, all five palettes, a narrow window, long hostnames and SSIDs.
-- **There are no breakpoints for "does it fit" — it is a MEASUREMENT.** Drag the window with the
-  mouse; do not test specific widths. Why: [chrome.md](chrome.md).
+If the sheet is invasive, the fence re-hosts it into `@layer theme` and scopes its selectors to the
+current view. Invasive means a selector not pinned to a name the theme does not style. A rule aimed
+at the chrome then matches nothing.
+
+Inject through a constructed sheet instead. It is not a DOM node:
+
+```js
+const s = new CSSStyleSheet(); s.replaceSync('* { box-shadow: none !important }');
+document.adoptedStyleSheets = [...document.adoptedStyleSheets, s];
+```
+
+### A page-scoped rule cannot be read off the gallery
+
+No element in `docs/gallery.html` carries `data-page`, its `#view` included. So a rule written
+`:where(#view)[data-page="admin-status-overview"] …` matches nothing there.
+
+Take the reading off the playground or a stand.
+
+### A leftover `dist/` can carry a version it is not
+
+A size comparison against a stale build moves in the wrong direction. Build the baseline fresh from
+the tag:
+
+```sh
+git archive <tag> | tar -x -C /clean/checkout && (cd /clean/checkout && ./tools/stage.sh)
+```
+
+### A hardware test build versioned `X.Y.Z_pN` never gives way to the release
+
+On apk `_p` is a patch level, and it sorts above `X.Y.Z`:
+
+| Command | Result |
+|---|---|
+| `apk version -t 0.14.15_rc1 0.14.15` | `<` |
+| `apk version -t 0.14.15_p1 0.14.15` | `>` |
+
+opkg sorts both `_rc1` and `_p1` above the release. Only `0.14.15~rc1` sorts below, and apk rejects
+it.
+
+- apk test build: stamp it as the next version's candidate, `FOOTSTRAP_VERSION=0.14.16_rc1` over
+  0.14.15.
+- opkg test build: it needs `opkg install --force-downgrade` back to the release.
+
+## The test matrix: pages and modes to check by hand
+
+| Axis | Cover |
+|---|---|
+| Pages | Status/Overview (tables, ifacebox), Network/Interfaces (zonebadge, modals), Network/Firewall (section table, dropdown), System/Software (progress), Realtime graphs (SVG), login/logout, Reboot. |
+| Apply/rollback sheet | The confirmation sheet `ui.js` draws over the theme. Custom z-indexes often break it. |
+| Modes | light/dark/auto, both layouts, all five palettes, a narrow window, long hostnames and SSIDs. |
+
+**"Does it fit" has no breakpoints: it is a measurement.** Drag the window with the mouse; do not
+test specific widths. Why: [chrome.md](chrome.md).
 
 ## Building a package locally
 
@@ -452,12 +721,23 @@ Two harness facts hold behind `tools/lib/stands.mjs`, which `capture` reads the 
 ./tools/stage.sh && owfeed build     # both formats, seconds, no toolchain
 ```
 
-That is what CI does. `luci-theme-footstrap/build-apk.sh` is a different path: a build through the
-OpenWrt SDK. It exists to prove the theme is still buildable by its Makefile, `luci.mk` and jsmin,
-for someone who has never heard of owfeed. Releases do not come out of it. The
-owfeed build is described in [ci.md](ci.md), `build-apk.sh` in [package.md](package.md).
+Expected output:
 
-Through owlab, an SDK build that writes `dist/<arch>/`, not owfeed's `dist/noarch` and `dist/all`:
+| Step | Writes |
+|---|---|
+| `./tools/stage.sh` | `dist/root`, `dist/VERSION` and `dist/scripts` |
+| `owfeed build` | the apk packages in `dist/noarch/` (`luci-theme-footstrap-<VERSION>-r1.apk`) and the ipk packages in `dist/all/` (`luci-theme-footstrap_<VERSION>-r1_all.ipk`), each with the `luci-i18n-footstrap-*` packages beside it |
+
+That is what CI does. The owfeed build is described in [ci.md](ci.md).
+
+`luci-theme-footstrap/build-apk.sh` is a different path: a build through the OpenWrt SDK.
+
+- It exists to prove the theme is still buildable by its Makefile, `luci.mk` and jsmin, for someone
+  who has never heard of owfeed.
+- Releases do not come out of it.
+- It is described in [package.md](package.md).
+
+Through owlab, an SDK build writes `dist/<arch>/`, not owfeed's `dist/noarch` and `dist/all`:
 
 ```sh
 owlab build                       # target taken from the first router in owlab.yaml; writes dist/<arch>/
@@ -467,9 +747,8 @@ owlab exec owrt2512 -- 'apk del luci-theme-footstrap'
 ```
 
 An SDK build differs from `sync` in a measurable way. A real build runs the sources through the
-minifiers, so code that works unminified and breaks minified stays invisible until you build a
-package. Without that step, the first person to see it is a user.
+minifiers. Code that works unminified and breaks minified stays invisible until you build a package.
+Without that step, the first person to see it is a user.
 
 On Apple Silicon this runs under emulation: every `openwrt/sdk` tag is `linux/amd64`. owlab warns
 before it starts.
-

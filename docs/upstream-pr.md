@@ -1,26 +1,40 @@
 # The pull request to openwrt/luci
 
-How to carry a footstrap release into `themes/luci-theme-footstrap` of openwrt/luci and get it merged.
-Upstream PRs bounce on form, rarely on code: how the commits are cut and how long the messages are.
+How to carry a footstrap release into `themes/luci-theme-footstrap` of openwrt/luci and get it
+merged, for the maintainer who sends the PR. Upstream PRs bounce on form, rarely on code: how the
+commits are cut and how long the messages are.
 
-## Order
+## Short version: the order of work
 
-1. **Split plan** — one upstream commit per independent concern; name each commit's subject and the
-   tag commits it replays.
-2. **Branch** — replay the latest release tag's states (never `main`) and cut the commits. Done =
+1. Split plan. One upstream commit per independent concern; name each commit's subject and the tag
+   commits it replays.
+2. Branch. Replay the latest release tag's states (never `main`) and cut the commits. Done when
    Step 3 prints `tip == tag`.
-3. **Preflight, before the first push** — every section of [Preflight](#preflight) green.
-4. **Messages** — written last, once the commit set is final: one or two sentences each.
-5. **Publish** — PR body: one line per commit; links and `Closes #NNNN`
-   live only here.
-6. **Review** — [Answering review](#answering-review).
+3. Preflight, before the first push. Every section of [Preflight](#preflight-catch-what-the-bot-flags-before-the-first-push)
+   is green.
+4. Messages, written last, once the commit set is final: one or two sentences each.
+5. Publish. The PR body has one line per commit; links and `Closes #NNNN` live only here.
+6. Review: [Answering review](#answering-review-close-each-remark-with-a-change).
 
-### How many commits
+## Contents
+
+- [One commit per concern](#one-commit-per-concern)
+- [Message form: short subject, one or two sentences of body](#message-form-short-subject-one-or-two-sentences-of-body)
+- [Hard rules, each one paid for by a bounce](#hard-rules-each-one-paid-for-by-a-bounce)
+- [Already refused: do not offer again](#already-refused-do-not-offer-again)
+- [Checklist before `gh pr create`](#checklist-before-gh-pr-create)
+- [Building the branch: replay our tag](#building-the-branch-replay-our-tag)
+- [Preflight: catch what the bot flags before the first push](#preflight-catch-what-the-bot-flags-before-the-first-push)
+- [Answering review: close each remark with a change](#answering-review-close-each-remark-with-a-change)
+
+## One commit per concern
 
 A release sync splits by concern: cleanup, API removal, router/SPA, security, CSS. A sync squashed
-into one commit is sent back. A small PR is one fix, one commit.
+into one commit is sent back.
 
-### Message form
+A small PR is one fix, one commit.
+
+## Message form: short subject, one or two sentences of body
 
 ```
 luci-theme-footstrap: lowercase description
@@ -30,29 +44,36 @@ What changed, one or two sentences, wrapped at 72 columns.
 Signed-off-by: Ivan Kvashonkin <vizzlef@gmail.com>
 ```
 
-Subject: at most 60 characters (the bot's hard limit is 80), package prefix, colon, lowercase, no final period; shared infrastructure (`luci.mk`)
-takes `treewide:` (the bot rejects `luci.mk:`). Investigation and measurements live in our
-changelog and code comments, not in the upstream body.
+The subject:
 
-### Hard rules (each one paid for by a bounce)
+- at most 60 characters; the bot's hard limit is 80;
+- package prefix, colon, lowercase, no final period;
+- shared infrastructure (`luci.mk`) takes `treewide:`. The bot rejects `luci.mk:`.
 
-- The commit body carries no `#NNNN` and no link: a force-push re-sends every mention.
+Investigation and measurements live in our changelog and code comments, not in the upstream body.
+
+## Hard rules, each one paid for by a bounce
+
+- The commit body carries no `#NNNN` and no link.
+  Why: a force-push re-sends every mention.
 - No compatibility with EOL releases.
 - The theme names no outside site and no repository of its own.
-- No speculative migrations: OpenWrt assumes a full image upgrade.
-- `po/` stays out: Weblate owns it.
+- No speculative migrations.
+  Why: OpenWrt assumes a full image upgrade.
+- `po/` stays out.
+  Why: Weblate owns it.
 - Release branches (`openwrt-25.12`, …) take bug and security fixes only.
-- `Makefile` is edited on the luci side by hand (`sync-luci-fork.sh` does not carry it), mirroring
-  our postinst/postrm/conffiles changes.
+- `Makefile` is edited on the luci side by hand, mirroring our postinst/postrm/conffiles changes.
+  Why: `sync-luci-fork.sh` does not carry it.
 
-### Already refused — do not offer again
+## Already refused: do not offer again
 
-1. 23.05 compatibility — "*We are the upstream project. We don't need to keep adding compatibility
+1. 23.05 compatibility. "*We are the upstream project. We don't need to keep adding compatibility
    code for old releases just because it happens to be possible*".
-2. A footer link to an outside site — "*None of the other themes do that*".
+2. A footer link to an outside site. "*None of the other themes do that*".
 3. A long `uci-defaults` with old-version cleanup.
 
-### Checklist before `gh pr create`
+## Checklist before `gh pr create`
 
 - [ ] one commit per concern
 - [ ] each body one or two sentences, wrapped at 72, no links or `#NNNN`
@@ -64,11 +85,12 @@ changelog and code comments, not in the upstream body.
 - [ ] `diff -r` tip == tag (Step 3)
 - [ ] no `po/`, none of our build scripts; `Makefile` only as a mirror of ours
 
-## Building the branch
+## Building the branch: replay our tag
 
-Upstream keeps the built `cascade.css`, not `styles/`, so every PR commit carries its own slice of
-the finished sheet. The branch is built by **replaying** states of our tree, never by moving
-`main`'s commits across.
+Upstream keeps the built `cascade.css`, not `styles/`. So every PR commit carries its own slice of
+the finished sheet.
+
+The branch is built by **replaying** states of our tree, never by moving `main`'s commits across.
 
 | Path | Role |
 |---|---|
@@ -77,8 +99,10 @@ the finished sheet. The branch is built by **replaying** states of our tree, nev
 | `../tmp/luci-pr` | THE clone of openwrt/luci: `origin` upstream, `fork` ours; all branch work here |
 | `../tmp/luci-ref` | worktree of that clone, the reference for Step 3 |
 
-**The source is the latest release tag** (`git describe --tags --abbrev=0`). A review fix rides on
-top of the tag until the next release.
+The source is the latest release tag (`git describe --tags --abbrev=0`). A review fix rides on top
+of the tag until the next release.
+
+Set up:
 
 ```sh
 git worktree add --detach ../tmp/fs-hist $(git describe --tags --abbrev=0)   # when it is missing
@@ -89,8 +113,8 @@ git -C $LUCI fetch origin && git -C $LUCI checkout --quiet -B <branch> origin/ma
 
 ### Step 1. Find where upstream matched us
 
-Compare **every shipped file**, not `cascade.css` alone. Each candidate tag is synced into a clean
-`origin/master` and `git status` is read; `Makefile` and `po/` are excluded.
+Compare every shipped file, not `cascade.css` alone. Each candidate tag is synced into a clean
+`origin/master`, and `git status` is read. `Makefile` and `po/` are excluded.
 
 ```sh
 for t in $(git tag --sort=-creatordate | head -10); do
@@ -102,8 +126,10 @@ for t in $(git tag --sort=-creatordate | head -10); do
 done
 ```
 
-The first tag at zero is the base. With no zero, take the minimum: its list is what upstream fixed
-on its own, carried into our tree before the replay.
+The first tag at zero is the base.
+
+With no zero, take the minimum. Its list is what upstream fixed on its own. Carry it into our tree
+before the replay.
 
 ### Step 2. Replay by the split plan
 
@@ -115,14 +141,23 @@ pick() { for c in "$@"; do git cherry-pick -n -x $c >/dev/null 2>&1 || {
 pick <commit> <commit> && git commit --quiet -m g1
 ```
 
-`pick` resolves every conflict to the picked side silently — safe only because Step 3 compares the
-tip with the tag. Moves needed in practice: drop part of a commit (`git checkout HEAD -- <file>`
-after `pick`), move part into another group (`git checkout <commit> -- <file>`), skip a commit
-(leave it out). A comment fix travels with the code it describes.
+`pick` resolves every conflict to the picked side silently. That is safe only because Step 3
+compares the tip with the tag.
 
-### Step 3. Tip == tag
+Moves needed in practice:
 
-Mandatory before cutting PR commits; the whole theme tree is compared, so a new file cannot drop out.
+| Move | How |
+|---|---|
+| drop part of a commit | `git checkout HEAD -- <file>` after `pick` |
+| move part into another group | `git checkout <commit> -- <file>` |
+| skip a commit | leave it out |
+
+A comment fix travels with the code it describes.
+
+### Step 3. Prove tip == tag
+
+Mandatory before cutting PR commits. The whole theme tree is compared, so a new file cannot drop
+out.
 
 ```sh
 git -C $LUCI worktree add --detach ../tmp/luci-ref origin/master      # when it is missing
@@ -134,9 +169,13 @@ git -C ../tmp/fs-hist checkout --quiet upstream-N
 diff -r -x Makefile -x po ../tmp/luci-ref/themes/luci-theme-footstrap $LUCI/themes/luci-theme-footstrap && echo "tip == tag"
 ```
 
-`sync-luci-fork.sh` exits 1 in two cases: a file mode differs from our index, or a shipped file
-references something outside the tree (`../tmp/`, `tools/`, a test file, stands, `issue #N`, a
-commit hash). Read its whole output.
+Expected: `tip == tag`.
+
+`sync-luci-fork.sh` exits 1 in two cases. Read its whole output.
+
+- A file mode differs from our index.
+- A shipped file references something outside the tree: `../tmp/`, `tools/`, a test file, stands,
+  `issue #N`, a commit hash.
 
 ### Step 4. Cut the PR commits
 
@@ -172,7 +211,7 @@ git -C $LUCI push --quiet fork <branch> \
   && gh pr create --repo openwrt/luci --base master --head VizzleTF:<branch> --title "..." --body-file <file>
 ```
 
-Update after review (the `&&` chain keeps the PR body unchanged when the push fails):
+Update after review. The `&&` chain keeps the PR body unchanged when the push fails:
 
 ```sh
 old=$(git -C $LUCI ls-remote fork refs/heads/<branch> | cut -f1) \
@@ -180,67 +219,132 @@ old=$(git -C $LUCI ls-remote fork refs/heads/<branch> | cut -f1) \
   && gh pr edit <N> --repo openwrt/luci --body-file <file>
 ```
 
-After the merge: `git worktree remove ../tmp/fs-hist`, `git -C $LUCI worktree remove ../tmp/luci-ref`.
+After the merge, remove the worktrees:
+
+```sh
+git worktree remove ../tmp/fs-hist
+git -C $LUCI worktree remove ../tmp/luci-ref
+```
 
 ### Traps
 
-- The author must be "First Last"; the clone inherits the global `VizzleTF` and bounces.
-- Upstream gets the minified `cascade.css` with unmangled tokens; templates, shell and JS travel unminified.
+- The author must be "First Last". The clone inherits the global `VizzleTF` and bounces.
+- Upstream gets the minified `cascade.css` with unmangled tokens. Templates, shell and JS travel
+  unminified.
 
-## Preflight
+## Preflight: catch what the bot flags before the first push
 
-All of it runs before the first push: what the upstream bot flags, a local run catches. The PR
-carries the latest tag's tree, so section 4 runs in `../tmp/fs-hist` detached at the tag
-(`git -C ../tmp/fs-hist checkout --quiet --detach $(git describe --tags --abbrev=0)` from our root).
+All of it runs before the first push. What the upstream bot flags, a local run catches.
 
-0. **Review the branch diff** (`git -C ../tmp/luci-pr diff origin/master..`, with
-   `git diff --raw` and `git diff --check` over the same range for modes and whitespace) for the classes the upstream bot flagged on #9111:
-   1. a removed or renamed API still referenced in the tree (grep the old name);
-   2. a lost executable bit (`--summary`, `mode change 100755 => 100644`, a `cgi-bin` file above all);
-   3. double blank lines, trailing whitespace, missing final newline (`git diff --check`);
-   4. references outside the tree in shipped files: `docs/`, `tools/`, `../tmp`, `#NNNN`, our repo
-      URL, `owlab`/`owfeed`;
-   5. dead exports nothing imports;
-   6. a visible behaviour change the commit body does not mention;
-   7. formalities (subject, body lines, `Signed-off-by`, no link in a body).
-1. **Our check**: the tag's CI run has `e2e` and `anchor` green on both routers
-   ([verifying.md](verifying.md)). `e2e` renders every template with the router's own ucode.
-2. **Their eslint on our files**, from their checkout's own `package.json` — their config lists
-   globals by hand and does not read the `'require X as Y'` pragma:
-   ```sh
-   cd ../tmp/luci-pr && npm install --ignore-scripts --no-save
-   node_modules/.bin/eslint themes/luci-theme-footstrap/htdocs | grep "is not defined"
-   ```
-   A warning on an alias is their config's defect; a warning on a real typo is a fix.
-3. **Their formalities** (`.github/formalities.json` in the clone). Subject soft 60 / hard 80. Body
-   required and not a repeat of the subject. `Signed-off-by` matching the author, a real full name.
-   Branch not `master`/`main`, no merge commits, no CRLF.
-   ```sh
-   awk 'length > 72 {print FILENAME": "FNR": "length}' <message files>   # empty
-   head -1 <file> | wc -c                                                # ≤ 61 with the newline
-   ```
-4. **Size** (reviewers ask):
-   `du -sb luci-theme-footstrap/ucode luci-theme-footstrap/htdocs/luci-static/resources`.
-5. **Security review** of the final branch against the previous synced tag, as in
-   [releasing.md](releasing.md) Step 2. First look: the signature chain in `install.sh`, new shell scripts, the login template (unauthenticated), sinks
-   in the browser JS, build pipeline changes.
+The PR carries the latest tag's tree. So section 4 runs in `../tmp/fs-hist` detached at the tag. From
+our root:
 
-## Answering review
+```sh
+git -C ../tmp/fs-hist checkout --quiet --detach $(git describe --tags --abbrev=0)
+```
+
+### 0. Review the branch diff
+
+Read `git -C ../tmp/luci-pr diff origin/master..`. Over the same range, run `git diff --raw` for
+modes and `git diff --check` for whitespace.
+
+Look for the classes the upstream bot flagged on #9111:
+
+1. a removed or renamed API still referenced in the tree (grep the old name);
+2. a lost executable bit: `--summary`, `mode change 100755 => 100644`, a `cgi-bin` file above all;
+3. double blank lines, trailing whitespace, missing final newline (`git diff --check`);
+4. references outside the tree in shipped files: `docs/`, `tools/`, `../tmp`, `#NNNN`, our repo URL,
+   `owlab`/`owfeed`;
+5. dead exports nothing imports;
+6. a visible behaviour change the commit body does not mention;
+7. formalities: subject, body lines, `Signed-off-by`, no link in a body.
+
+### 1. Our check
+
+The tag's CI run has `e2e` and `anchor` green on both routers ([verifying.md](verifying.md)). `e2e`
+renders every template with the router's own ucode.
+
+### 2. Their eslint on our files
+
+Run it from their checkout's own `package.json`. Their config lists globals by hand and does not
+read the `'require X as Y'` pragma.
+
+```sh
+cd ../tmp/luci-pr && npm install --ignore-scripts --no-save
+node_modules/.bin/eslint themes/luci-theme-footstrap/htdocs | grep "is not defined"
+```
+
+| Warning on | Meaning |
+|---|---|
+| an alias | their config's defect |
+| a real typo | a fix |
+
+### 3. Their formalities
+
+The rules are in `.github/formalities.json` in the clone:
+
+- subject soft 60 / hard 80;
+- body required and not a repeat of the subject;
+- `Signed-off-by` matching the author, a real full name;
+- branch not `master`/`main`;
+- no merge commits;
+- no CRLF.
+
+```sh
+awk 'length > 72 {print FILENAME": "FNR": "length}' <message files>   # empty
+head -1 <file> | wc -c                                                # ≤ 61 with the newline
+```
+
+### 4. Size
+
+Reviewers ask for it:
+
+```sh
+du -sb luci-theme-footstrap/ucode luci-theme-footstrap/htdocs/luci-static/resources
+```
+
+### 5. Security review
+
+Review the final branch against the previous synced tag, as in [releasing.md](releasing.md),
+Check B, "The security review stays local".
+
+Look first at:
+
+- the signature chain in `install.sh`;
+- new shell scripts;
+- the login template, which is unauthenticated;
+- sinks in the browser JS;
+- build pipeline changes.
+
+## Answering review: close each remark with a change
 
 A remark is closed by a change in the diff and by resolving its thread.
 
-**Watching**: `gh pr checks <N> --repo openwrt/luci --watch` for CI, and `gh pr view <N> --repo
-openwrt/luci --comments` for reviews, comments and state. Done = `MERGED` or `CLOSED`.
+Watch the PR:
 
-**Humans first.** Before any bot event, read every review:
-`gh api repos/openwrt/luci/pulls/<N>/reviews --jq '.[] | "=== \(.user.login) [\(.state)]\n\(.body)"'`.
+| What | Command |
+|---|---|
+| CI | `gh pr checks <N> --repo openwrt/luci --watch` |
+| reviews, comments and state | `gh pr view <N> --repo openwrt/luci --comments` |
+
+Done = `MERGED` or `CLOSED`.
+
+### Humans first
+
+Before any bot event, read every review:
+
+```sh
+gh api repos/openwrt/luci/pulls/<N>/reviews --jq '.[] | "=== \(.user.login) [\(.state)]\n\(.body)"'
+```
+
 A review by anyone other than `openwrt-ai` comes first.
 
 ### The bot (`openwrt-ai`)
 
-1. **Check every remark** before acting on it: the bot is wrong often enough.
-2. A real defect: fix it on our `main` so the next tag carries it, and bring the same change into
-   the commit it belongs to here (amend or fixup). Step 3 then runs against tag + fixes:
+1. Check every remark before acting on it: the bot is wrong often enough.
+2. A real defect: fix it on our `main`, so the next tag carries it. Bring the same change into the
+   commit it belongs to here (amend or fixup). Step 3 then runs against tag + fixes:
+
    ```sh
    git -C ../tmp/fs-hist checkout --quiet --detach <tag>
    git -C ../tmp/fs-hist cherry-pick <main fix sha>...
@@ -248,20 +352,26 @@ A review by anyone other than `openwrt-ai` comes first.
    (cd ../tmp/fs-hist && ./tools/sync-luci-fork.sh "$REF") &&
    diff -r -x Makefile -x po ../tmp/luci-ref/themes/luci-theme-footstrap ../tmp/luci-pr/themes/luci-theme-footstrap && echo "tip == tag"
    ```
-   A cherry-pick conflict in `CHANGELOG*.md` takes the tag's side; one under
-   `luci-theme-footstrap/` means the fix leans on post-tag `main` and must be ported in
-   `../tmp/fs-hist`.
+
+   Expected: `tip == tag`. On a cherry-pick conflict:
+   - in `CHANGELOG*.md`, take the tag's side;
+   - under `luci-theme-footstrap/`, the fix leans on post-tag `main` and must be ported in
+     `../tmp/fs-hist`.
 3. A false remark: no change, one line on why.
-4. A remark on a comment is applied **verbatim**; any departure is shown as "bot suggests X / I
+4. A remark on a comment is applied **verbatim**. Any departure is shown as "bot suggests X / I
    suggest Y".
 
 Resolve only threads fixed or measurably refuted, after the push lands.
 
 ### A person
 
-Read it whole (never from the truncated notification) and give a verdict per point (we do it / the
-reviewer is mistaken, here is why / needs a decision). Obvious fixes
-go in at once; a disputed point waits.
+Read the review whole, never from the truncated notification. Give a verdict per point:
+
+- we do it;
+- the reviewer is mistaken, here is why;
+- needs a decision.
+
+Obvious fixes go in at once; a disputed point waits.
 
 ### Commands
 
@@ -281,7 +391,7 @@ gh api repos/openwrt/luci/commits/$(git -C ../tmp/luci-pr rev-parse HEAD)/check-
 ### Stance
 
 - A thread is resolved only when fixed or refuted by measurement, never by explanation alone.
-- "We are the upstream" wins: removing compatibility or moving a change to its own PR is cheaper to
+- "We are the upstream" wins. Removing compatibility or moving a change to its own PR is cheaper to
   do than to argue.
-- Reworking the form goes into the same branch with `--force-with-lease`; a PR is closed only when
+- Reworking the form goes into the same branch with `--force-with-lease`. A PR is closed only when
   its subject changes.

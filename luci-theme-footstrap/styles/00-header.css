@@ -12,5 +12,5 @@
 
 /* Layer order, declared here and nowhere else. Directory-to-layer map, concatenation order and
  * the hijack risk from a foreign sheet naming a layer first: docs/css.md "One directory per
- * cascade layer" and "Layer order is fixed by the FIRST mention of a name". */
+ * cascade layer", "Layers" and "Layer order is fixed by the FIRST mention of a name". */
 @layer tokens, base, theme, page;

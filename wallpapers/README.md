@@ -1,78 +1,107 @@
 # Pattern wallpapers
 
-Two drawings to try the **Appearance → Background → Wallpaper → Pattern** axis with.
+Two drawings to try the **Appearance → Background → Wallpaper → Pattern** axis with, for a router admin.
+Upload one from that page like any other file, or install it from a shell with `set-pattern.sh`.
 
-They are **not part of the theme package**, and the theme does not download them: nothing in
-footstrap reaches the network at run time. Save one and upload it from that page like any other file, or run
-this on the router, as root:
+They are not part of the theme package, and the theme does not download them.
+Nothing in footstrap reaches the network at run time.
 
-```sh
-wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/wallpapers/set-pattern.sh | sh -s cats
-```
-
-`cats` or `dinos`. Details below.
+## The two drawings
 
 | file | size | tile |
 |---|---|---|
 | `svg/cats.svg` | 71 kB | 870 units square, reads well around 440 px |
 | `svg/dinos.svg` | 128 kB | 2048 units square, reads well around 880 px |
 
-## Putting one back on a router without a browser
+## Install one from a shell
 
-`set-pattern.sh` does from a shell exactly what the Appearance page's upload does. It is a script
-here, outside the theme, for one reason: **the admin fetches the drawing deliberately, once**. The
-one-liner above is the whole interface, in the shape the theme's own `install.sh` uses.
+Run this on the router, as root:
 
-`cats` and `dinos` are the two drawings above. Anything else is taken as a URL or a local file, so
-your own tile installs the same way. The options:
+```sh
+wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/wallpapers/set-pattern.sh | sh -s cats
+```
 
-- `--size`: 40–1600 px, default per drawing.
-- `--strength`: 0–100 %.
-- `--ink theme|original`.
-- `--keep-wallpaper`: install the file but leave the wallpaper axis alone.
-
+The argument is `cats` or `dinos`, the two drawings above.
+Anything else is taken as a URL or a local file, so your own tile installs the same way.
 `remove` as the argument deletes the pattern and turns the wallpaper off.
 
-It writes `/etc/footstrap/pattern.svg` at 0644. The theme serves that file through
-`/cgi-bin/luci-theme-footstrap-pattern`. The script saves the file's md5 as
-`footstrap.settings.pattern`, next to the wallpaper, size, strength and colour settings. Together
-they are the *router's* default. **A browser that has already chosen a wallpaper keeps its own
-choice**: every axis is per-browser first and the router default second. On such a browser press
-*Reset to router* on System → Footstrap, or pick Pattern there by hand.
+| Option | Values |
+|---|---|
+| `--size` | 40–1600 px, default per drawing |
+| `--strength` | 0–100 % |
+| `--ink` | `theme` or `original` |
+| `--keep-wallpaper` | Install the file but leave the wallpaper axis alone |
 
-A shell has no `DOMParser`, so the script checks the file by text matching. It refuses a file that
-trips a check instead of cleaning it. The checks catch:
+### The script is outside the theme so the admin fetches the drawing once
 
-- an executing or embedding element: `script`, `foreignObject`, `iframe`, `embed`, `object`,
-  `audio`, `video`, `animate`, `set`;
+`set-pattern.sh` does from a shell exactly what the Appearance page's upload does.
+It lives here, outside the theme, for one reason: the admin fetches the drawing deliberately, once.
+
+The one-liner above is the whole interface, in the shape the theme's own `install.sh` uses.
+
+### What the script writes
+
+1. It writes `/etc/footstrap/pattern.svg` at 0644. The theme serves that file through `/cgi-bin/luci-theme-footstrap-pattern`.
+2. It saves the file's md5 as `footstrap.settings.pattern`, next to the wallpaper, size, strength and colour settings.
+
+Together these settings are the router's default.
+
+### A browser that already chose a wallpaper keeps its choice
+
+Every axis is per-browser first and the router default second.
+So **a browser that has already chosen a wallpaper keeps its own choice**.
+
+On such a browser, do one of these:
+
+- press *Reset to router* on System → Footstrap;
+- or pick Pattern there by hand.
+
+### The script refuses a suspicious file instead of cleaning it
+
+A shell has no `DOMParser`, so the script checks the file by text matching.
+It refuses a file that trips a check. The checks catch:
+
+- an executing or embedding element: `script`, `foreignObject`, `iframe`, `embed`, `object`, `audio`, `video`, `animate`, `set`;
 - an event handler;
 - a `javascript:` URL;
 - a reference off the router.
 
-Text matching is a cruder instrument than the page's parser, so a file the script refuses can still
-be uploaded from the page.
+Text matching is a cruder instrument than the page's parser.
+So a file the script refuses can still be uploaded from the page.
 
 ## What makes a good pattern
 
-**Line art on a transparent background.** In the default *Colours: Theme* mode the SVG is painted
-through a CSS `mask`. The file supplies only its alpha and the theme supplies the ink. So one upload
-reads correctly in light mode, in dark mode and under every palette. A drawing with an opaque
-background rectangle masks as a solid sheet. For artwork that carries its own palette, switch that
-row to *As in file*, and the theme uses it as an ordinary tiled image.
+| Rule | Why |
+|---|---|
+| Line art on a transparent background | See [Line art](#use-line-art-on-a-transparent-background). |
+| No visible seams at any size | The Scale slider sets the tile's edge (40–1600 px), and the drawing repeats in both directions. |
+| No low opacity baked into the artwork | The Strength slider fades the whole layer (0–100 %, default 20 %). A file that is already faint cannot be turned up. |
 
-**No visible seams at any size.** The Scale slider sets the tile's edge (40–1600 px), and the
-drawing repeats in both directions. Both files here tile without visible seams, so the number is a
-legibility choice, not a geometric constraint.
+### Use line art on a transparent background
 
-**Strength is a knob, not a property of the file.** Do not bake a low opacity into the artwork.
-The Strength slider fades the whole layer (0–100 %, default 20 %), and a file that is already faint
-cannot be turned up.
+In the default *Colours: Theme* mode the SVG is painted through a CSS `mask`.
+The file supplies only its alpha, and the theme supplies the ink.
+So one upload reads correctly in light mode, in dark mode and under every palette.
 
-## What the theme will refuse
+A drawing with an opaque background rectangle masks as a solid sheet.
 
-The page parses the upload with `DOMParser`, inertly: nothing runs. It rejects the file if it does
-not parse, if its root is not an `<svg>` in the SVG namespace, or if it is over 512 kB. Otherwise it
-removes the unsafe parts and says how many it removed:
+For artwork that carries its own palette, switch that row to *As in file*.
+The theme then uses it as an ordinary tiled image.
+
+Both files here tile without visible seams.
+So the Scale number is a legibility choice, not a geometric constraint.
+
+## What the theme will refuse on upload
+
+The page parses the upload with `DOMParser`, inertly: nothing runs.
+
+It rejects the file in these cases:
+
+- it does not parse;
+- its root is not an `<svg>` in the SVG namespace;
+- it is over 512 kB.
+
+Otherwise it removes the unsafe parts and says how many it removed:
 
 - elements outside the SVG namespace;
 - `script` and `foreignObject`;
@@ -81,8 +110,7 @@ removes the unsafe parts and says how many it removed:
 - event handlers (`^on[a-z]+$`);
 - `xml:base`;
 - CSS references off the document;
-- any `href` that is not a `#fragment` or a raster `data:` image on an `<image>`. Those two forms
-  are how a tile refers to its own `<defs>` and embeds a bitmap.
+- any `href` that is not a `#fragment` or a raster `data:` image on an `<image>`. Those two forms are how a tile refers to its own `<defs>` and embeds a bitmap.
 
 A file with nothing left after cleaning is rejected.
 
