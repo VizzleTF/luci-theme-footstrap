@@ -57,7 +57,6 @@ Why: a bug with no check comes back silently.
 | `<DATE>` | the day you make the release commit, `YYYY-MM-DD` | `date +%F` |
 | `<ID>` | a run id, from the `ID` column of `gh run list` | |
 | `<SHA>` | a commit sha | |
-| `<arch>` | a router's package architecture: `/etc/apk/arch` on 25.12, `DISTRIB_ARCH` on 24.10; this repo keeps no list of the feed's architectures | |
 
 Scratch output goes to `../tmp/release-<VERSION>/`.
 
@@ -658,14 +657,41 @@ The next scheduled run can be hours away. So dispatch it yourself:
 
    Expected: each run ends in `success`.
 
-4. Read the served index, not the workflow log, and confirm the new version is there. `<arch>` is
-   a router's package architecture: `/etc/apk/arch` on 25.12, `DISTRIB_ARCH` in
-   `/etc/openwrt_release` on 24.10. Expected: `<VERSION>-r1`, the `-r1` that `PKG_RELEASE:=1` puts
-   on every package.
-   - 24.10: `Packages.gz` on `https://repo.owfeed.org/releases/24.10/<arch>/`. Look for `Version:`
-     after `Package: luci-theme-footstrap`.
-   - 25.12: `apk adbdump` on `releases/25.12/<arch>/packages.adb`, from a router or stand. The file
-     is compressed, so `strings` finds nothing.
+4. Read the served index of every architecture, not the workflow log. The list of architectures
+   is owfeed-packages' `owfeed.lock`, so take it from there:
+
+   ```sh
+   gh api repos/owfeed/owfeed-packages/contents/owfeed.lock --jq .content | base64 -d \
+     > ../tmp/release-<VERSION>/owfeed.lock
+   arches() { awk -v want="$1" '/- line:/{l=$3; gsub(/"/,"",l)} /^ *- [a-z0-9_-]+$/ && l==want{print $2}' \
+     ../tmp/release-<VERSION>/owfeed.lock; }
+   ```
+
+   24.10 serves `Packages.gz`:
+
+   ```sh
+   for a in $(arches 24.10); do
+     v=$(curl -fsS "https://repo.owfeed.org/releases/24.10/$a/Packages.gz" | gunzip \
+       | awk '/^Package: luci-theme-footstrap$/{f=1} f&&/^Version:/{print $2; exit}')
+     [ "$v" = "<VERSION>-r1" ] || echo "MISS 24.10 $a: '$v'"
+   done
+   ```
+
+   25.12 serves a compressed `packages.adb`, which only `apk adbdump` reads. Pipe each one into a
+   running 25.12 stand:
+
+   ```sh
+   for a in $(arches 25.12); do
+     v=$(curl -fsS "https://repo.owfeed.org/releases/25.12/$a/packages.adb" \
+       | owlab exec owrt2512 -- sh -c 'cat >/tmp/p.adb && apk adbdump /tmp/p.adb' 2>/dev/null \
+       | awk '/name: luci-theme-footstrap$/{f=1;next} f&&/version:/{print $2; exit}')
+     [ "$v" = "<VERSION>-r1" ] || echo "MISS 25.12 $a: '$v'"
+   done
+   ```
+
+   Expected: no `MISS` line from either loop. The `-r1` is what `PKG_RELEASE:=1` puts on every
+   package. A `MISS` with an empty version means that index does not carry the theme yet: wait for
+   `publish.yml` and run the loop again.
 
 Remove the scratch directory:
 
