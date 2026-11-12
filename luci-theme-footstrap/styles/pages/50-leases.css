@@ -1,6 +1,6 @@
 @layer page {
 	/* DHCP leases nowrap by default; `.lases` is upstream's 24.10 spelling (issue #7), do not drop.
-	 * docs/css.md "Leases: nowrap counted from the end". */
+	 * docs/css-fixes.md "Leases: nowrap counted from the end". */
 	#view table.fs-dt:is(.leases, .lases, .leases6):not(.fs-stacked) .td { white-space: nowrap; }
 
 	/* opaque columns re-permitted to wrap; counted from the END, split on column COUNT — docs/css.md

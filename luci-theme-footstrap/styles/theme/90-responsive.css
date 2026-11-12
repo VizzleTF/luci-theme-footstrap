@@ -1,6 +1,6 @@
 @layer theme {
 	/* phone overflow safety net (<=767px): .fs-main is overflow-x: clip, cutting anything wider silently; tablets were clean */
-	/* split-button labels wrap under 360px — docs/css.md "Responsive: a split button's label must wrap under 360px" */
+	/* split-button labels wrap under 360px — docs/css-fixes.md "Responsive: a split button's label must wrap under 360px" */
 	@container fs-view (max-width: 22.5rem) {
 		#view .cbi-button, #view .btn,
 		#view input[type="button"], #view input[type="submit"], #view input[type="reset"] {
@@ -29,7 +29,7 @@
 			display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--fs-space-2);
 		}
 		:where(#view)[data-page="admin-system-package-manager"] .controls > .pager > .text { flex: 0 1 auto; min-width: 0; }
-		/* disk gauge value moved BELOW the bar — docs/css.md "Responsive: the disk gauge value moves below the bar" */
+		/* disk gauge value moved BELOW the bar — docs/css-fixes.md "Responsive: the disk gauge value moves below the bar" */
 		:where(#view)[data-page="admin-system-package-manager"] label + .cbi-progressbar {
 			width: 100%; margin-bottom: 3em;
 		}
@@ -48,7 +48,7 @@
 
 		/* Diagnostics stack not here: fs-select.js writes .fs-rowstack at any width, theme/30-tables.css carries it */
 
-		/* no `table.fs-dt { display: block }`: discards the table context — docs/css.md "Responsive: no `display: block` on `table.fs-dt`" */
+		/* no `table.fs-dt { display: block }`: discards the table context — docs/css-fixes.md "Responsive: no `display: block` on `table.fs-dt`" */
 
 		/* generic caps: a field never exceeds its column */
 		.cbi-value-field input, .cbi-value-field select { max-width: 100%; }

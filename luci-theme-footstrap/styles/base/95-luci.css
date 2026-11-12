@@ -25,7 +25,7 @@
 		font-weight: var(--fs-weight-bold);
 	}
 
-	/* GridSection name column, discriminated by markup not release: docs/css.md "base/95-luci.css:
+	/* GridSection name column, discriminated by markup not release: docs/css-fixes.md "base/95-luci.css:
 	 * the GridSection name column, read from the markup, not the release" (issue #9). Column
 	 * geometry lives in theme/30-tables.css, next to the real cells it lines up with. */
 	.cbi-section-table-titles.named[data-title]::before,
@@ -147,14 +147,14 @@
 		padding: var(--fs-space-0-5);
 	}
 
-	/* !important fights luci-mod-network's inline zone-colour style=: docs/css.md "base/95-luci.css:
+	/* !important fights luci-mod-network's inline zone-colour style=: docs/css-fixes.md "base/95-luci.css:
 	 * the dark-mode zone tint, and why it has no grey fallback". */
 	[data-darkmode="true"] .zonebadge[style],
 	[data-darkmode="true"] .ifacebox-head[style] {
 		background: linear-gradient(rgba(var(--zone-color-rgb), .4), rgba(var(--zone-color-rgb), .3)) !important;
 	}
 
-	/* generalised once: docs/css.md "base/95-luci.css: the overflow-wrap fix generalised once, not
+	/* generalised once: docs/css-fixes.md "base/95-luci.css: the overflow-wrap fix generalised once, not
 	 * restated per page". */
 	.ifacebox .ifacebox-body {
 		padding: var(--fs-space-1);
@@ -419,7 +419,7 @@
 
 	/* Rotate in CSS, never a SMIL <animateTransform> inside the data-URI: that runs in the SVG's
 	 * own document, out of reach of the page's `prefers-reduced-motion`. In-flow glyph, not
-	 * absolutely positioned: docs/css.md "base/95-luci.css: the spinner glyph sits in the flow, on
+	 * absolutely positioned: docs/css-fixes.md "base/95-luci.css: the spinner glyph sits in the flow, on
 	 * purpose" (issues #15, #22). */
 	.spinning::before {
 		/* The head is a quarter dash of the track's own circle (2π·8/4), not a Bézier arc: the curve
@@ -466,7 +466,7 @@
 		transition: opacity var(--fs-dur-fade);
 	}
 
-	/* min(210px, 100%) floor: docs/css.md "base/95-luci.css: the file browser's floor, and the row
+	/* min(210px, 100%) floor: docs/css-fixes.md "base/95-luci.css: the file browser's floor, and the row
 	 * that is not text". */
 	.cbi-filebrowser {
 		min-width: min(13.125rem, 100%);
@@ -495,7 +495,7 @@
 	}
 
 	/* .right is not one line of text (upload strip + Create/Cancel), so it opts out of the
-	 * nowrap+ellipsis assumption above: docs/css.md "base/95-luci.css: the file browser's floor,
+	 * nowrap+ellipsis assumption above: docs/css-fixes.md "base/95-luci.css: the file browser's floor,
 	 * and the row that is not text". */
 	.cbi-filebrowser > .right {
 		white-space: normal;
@@ -559,7 +559,7 @@
 	 * ride (coverage contract, docs/conventions.md). The theme's own `.fade-in` CLASS rule is gone
 	 * on purpose — luci-mod-status re-marks it on every poll tick, replaying anything hung there.
 	 * `fs-fade` is one-shot instead, played once by the rail flyout and the search overlay.
-	 * docs/css.md "Misc: fade-in animates nothing, on purpose". */
+	 * docs/css-fixes.md "Misc: fade-in animates nothing, on purpose". */
 	@keyframes fs-fade {
 		from { opacity: 0; transform: translateY(4px); }
 		to { opacity: 1; transform: none; }
@@ -586,7 +586,7 @@
 		width: 25%;
 	}
 
-	/* PNGs on a white ground, inverted for dark mode: docs/css.md "base/95-luci.css: Statistics
+	/* PNGs on a white ground, inverted for dark mode: docs/css-fixes.md "base/95-luci.css: Statistics
 	 * graphs and Realtime SVGs are art drawn for a white ground" — 180deg is exact for the three
 	 * primaries, not tuned further. */
 	[data-darkmode="true"] :where(#view)[data-page="admin-statistics-graphs"] [data-plugin] img {

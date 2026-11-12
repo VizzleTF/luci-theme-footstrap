@@ -1,6 +1,6 @@
 @layer page {
 	/* The settings page is ordinary page content: stock .cbi-section cards and .cbi-value rows
-	 * (view/footstrap/appearance.js). docs/css.md "Appearance: from popover to page, and what stayed CSS". */
+	 * (view/footstrap/appearance.js). docs/css-fixes.md "Appearance: from popover to page, and what stayed CSS". */
 
 	.fs-ap > .fs-ap-card:last-child { margin-bottom: 0; }
 	/* a subheading splits a card: the eyebrow over the rows it introduces */
@@ -11,7 +11,7 @@
 	}
 
 	/* rows are stock .cbi-value with no layout of their own — base/30-forms.css and
-	 * theme/60-inputs.css already draw every other LuCI form this way. docs/css.md above. */
+	 * theme/60-inputs.css already draw every other LuCI form this way. docs/css-fixes.md above. */
 	/* The tab panes are whole cards (ui.tabs, view/footstrap/appearance.js). The stock rule hides an inactive
 	 * pane by height and leaves its padding, border and gap standing as an empty bar; nothing in
 	 * these panes measures itself, so it can leave the layout instead.
@@ -89,7 +89,7 @@
 	}
 	.fs-color-clear { flex: 0 0 auto; font-size: var(--fs-type-xs); padding: var(--fs-space-1-5) var(--fs-space-2); }
 
-	/* live contrast readout, not a validation, shown only below AA — docs/css.md above */
+	/* live contrast readout, not a validation, shown only below AA — docs/css-fixes.md above */
 	.fs-color-contrast { font-family: var(--fs-font-sans); font-size: var(--fs-type-xs); font-variant-numeric: tabular-nums; }
 	.fs-contrast-aa-large { color: var(--fs-warn); }
 	.fs-contrast-low { color: var(--fs-danger); }

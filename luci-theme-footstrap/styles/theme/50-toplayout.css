@@ -1,6 +1,6 @@
 @layer theme {
 	/* a DELTA on top of the bar's unguarded base (20-shell.css), every width — no @media floor,
-	 * fitChrome measures instead — docs/css.md "Toplayout: measured, not media-queried". */
+	 * fitChrome measures instead — docs/css-fixes.md "Toplayout: measured, not media-queried". */
 	:root[data-layout="top"] .fs-sidebar {
 		/* min-height not height: a long hostname wraps the capped brand onto a second line (20-shell.css) */
 		min-height: var(--fs-bar-h);

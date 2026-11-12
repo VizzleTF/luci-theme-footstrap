@@ -12,7 +12,7 @@
 		padding-top: var(--fs-space-5);
 	}
 
-	/* Stays in BASE: docs/css.md "Forms: control typography stays in base, on purpose". select is
+	/* Stays in BASE: docs/css-fixes.md "Forms: control typography stays in base, on purpose". select is
 	 * excluded, and an input's size is theme/60-inputs.css's --fs-type-field. */
 	label,
 	input,
@@ -40,7 +40,7 @@
 		padding-top: var(--fs-space-1); /* lands the label's first baseline on the field's */
 		flex: 0 0 11.25rem; /* column WIDTH (longest option label), not on the 4px step scale */
 		text-align: end; /* towards the field — not base/95-luci.css's physical .left/.right/.center */
-		/* docs/css.md "Forms: the label column's min-width: 0 survives the responsive layer" —
+		/* docs/css-fixes.md "Forms: the label column's min-width: 0 survives the responsive layer" —
 		 * stated here, not in theme/90-responsive.css. */
 		min-width: 0;
 	}
@@ -177,7 +177,7 @@
 		text-align: end;
 	}
 
-	/* Physical, hand-mirrored: docs/css.md "Widgets: .actions .secondary-action still floats, and
+	/* Physical, hand-mirrored: docs/css-fixes.md "Widgets: .actions .secondary-action still floats, and
 	 * needs a hand RTL mirror". */
 	.actions .secondary-action {
 		float: right;

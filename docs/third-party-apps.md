@@ -320,10 +320,10 @@ its right-hand columns.
 header row. It adds `.table.fs-dt` and copies the column headings into `data-title`.
 
 A table with no header row is left alone and scrolls. What each kind of table gets:
-[css.md](css.md#which-of-the-three-a-table-gets-and-what-decides-it).
+[css.md](css-fixes.md#which-of-the-three-a-table-gets-and-what-decides-it).
 
 The claim is re-made on every fit pass
-([the ladder](css.md#the-ladder-what-happens-when-a-table-does-not-fit)). These tables are polled:
+([the ladder](css-fixes.md#the-ladder-what-happens-when-a-table-does-not-fit)). These tables are polled:
 the app replaces the rows inside the same element. Fresh rows need `.tr`/`.td` and captions again.
 
 The one judgement, "does this table speak LuCI's row vocabulary?", is taken once and remembered on

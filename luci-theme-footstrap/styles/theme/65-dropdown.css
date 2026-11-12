@@ -22,7 +22,7 @@
 
 	/* ---- cbi-dropdown widget: the JS select used across all forms ---- */
 	/* machinery absorbed from base, driven by ui.js attributes; the state machine below is
-	 * UNFLAGGED, stating openly what upstream's !important flags resolved — docs/css.md
+	 * UNFLAGGED, stating openly what upstream's !important flags resolved — docs/css-fixes.md
 	 * "Dropdown: the display state machine, unflagged" has the rule. */
 	.cbi-dropdown {
 		display: inline-flex;
@@ -80,7 +80,7 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	/* ellipsis did nothing until min-width: 0 — a flex item's automatic minimum floors it at its
-		 * own content width — docs/css.md "Dropdown: ellipsis needs `min-width: 0` first". */
+		 * own content width — docs/css-fixes.md "Dropdown: ellipsis needs `min-width: 0` first". */
 		min-width: 0;
 		flex-shrink: 1;
 		flex-grow: 1;
@@ -115,7 +115,7 @@
 		margin-inline: 0 var(--fs-space-1);
 	}
 
-	/* ---- the display state machine, on specificity (docs/css.md "Dropdown: the display state machine, unflagged") ---- */
+	/* ---- the display state machine, on specificity (docs/css-fixes.md "Dropdown: the display state machine, unflagged") ---- */
 	/* a closed optional dropdown with an empty value renders EMPTY unflagged too: the placeholder
 	 * hider out-specifies the generic shower. :not([open]) keeps this out of the open list. */
 	.cbi-dropdown > ul > li[display],
@@ -263,7 +263,7 @@
 	}
 	.cbi-dropdown[open] > ul.dropdown > li:hover,
 	.cbi-dropdown[open] > ul.dropdown > li.focus { background: var(--fs-panel2); color: var(--fs-accent); }
-	/* after hover on purpose: hovering the selected row must still read as selected — docs/css.md
+	/* after hover on purpose: hovering the selected row must still read as selected — docs/css-fixes.md
 	 * "Dropdown: the open list's rail and the selected-row's contrast". */
 	.cbi-dropdown[open] > ul.dropdown > li[selected] {
 		background: var(--fs-panel2); color: var(--fs-accent); box-shadow: var(--fs-row-rail);
@@ -299,7 +299,7 @@
 
 	/* below ~960px a multi-dropdown row no longer fits, so each row cards, same shape as the
 	 * data-table stack (theme/30-tables.css); a @container, not the tables' own measurement, since
-	 * un-collapsing a row to measure it CHANGES what its widgets read. 992, not 960 — docs/css.md
+	 * un-collapsing a row to measure it CHANGES what its widgets read. 992, not 960 — docs/css-fixes.md
 	 * "Dropdown: 992px, not 960" has the padding subtraction and the regression it fixed. */
 	@container fs-content (max-width: 62rem) {
 		.table.cbi-section-table,

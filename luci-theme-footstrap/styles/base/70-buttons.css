@@ -11,7 +11,7 @@
 	/* border-color: theme/60-inputs.css — absorbed. */
 	.cbi-input-invalid { color: var(--fs-danger); }
 
-	/* Not a clearfix — flex container, nothing floats: docs/css.md "Buttons: the flex clearfix,
+	/* Not a clearfix — flex container, nothing floats: docs/css-fixes.md "Buttons: the flex clearfix,
 	 * and why float is dead on .cbi-page-actions". */
 	.cbi-page-actions::after {
 		display: table;

@@ -125,7 +125,7 @@
 		background-color: var(--fs-panel2);
 		color: var(--fs-text);
 		padding: 1px var(--fs-space-1);
-		/* docs/css.md "Typography and widgets: an opaque token needs overflow-wrap: anywhere, a
+		/* docs/css-fixes.md "Typography and widgets: an opaque token needs overflow-wrap: anywhere, a
 		 * tooltip needs pre-wrap" — a WireGuard key measured 64px past the column at 320px. */
 		overflow-wrap: anywhere;
 	}

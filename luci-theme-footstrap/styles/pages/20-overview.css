@@ -1,9 +1,9 @@
 @layer page {
 	/* Every !important here fights an inline style= from luci-mod-status's 29_ports.js — page is
-	 * the last layer, so a flag fighting only another footstrap rule is not kept. docs/css.md
+	 * the last layer, so a flag fighting only another footstrap rule is not kept. docs/css-fixes.md
 	 * "Overview: the port-tile reskin". */
 
-	/* decoration only, glyph aria-hidden — docs/css.md "Overview: the disclosure pill, the grid,
+	/* decoration only, glyph aria-hidden — docs/css-fixes.md "Overview: the disclosure pill, the grid,
 	 * and the duplicate heading" */
 	.cbi-title .label[data-indicator="poll-status"] {
 		font-size: 0;
@@ -43,7 +43,7 @@
 		gap: var(--fs-space-4);
 		margin-bottom: var(--fs-card-gap);	/* match stock .cbi-section spacing below the grid */
 	}
-	/* min-width:0 so an item shrinks to its TRACK, not its content's min-width — docs/css.md above */
+	/* min-width:0 so an item shrinks to its TRACK, not its content's min-width — docs/css-fixes.md above */
 	.fs-ovl > .fs-ovl-sys,
 	.fs-ovl > .fs-ovl-mem,
 	.fs-ovl > .fs-ovl-sto { margin: 0; min-width: 0; }
@@ -65,7 +65,7 @@
 		grid-template-columns: repeat(auto-fit, minmax(calc(76px * var(--fs-density-type) + var(--fs-space-3) * 2), 1fr)) !important;
 		margin-bottom: 0 !important;
 	}
-	/* flex-wrap, not a grid+@container threshold (issue #7) — docs/css.md above */
+	/* flex-wrap, not a grid+@container threshold (issue #7) — docs/css-fixes.md above */
 	:where(#view)[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) {
 		margin: 0 !important;
 		min-width: 0 !important;
@@ -142,7 +142,7 @@
 
 	/* meter rows — a key/value-shaped .table row with a .cbi-progressbar (same shape test as
 	 * :218 below and 30-tables.css's key/value rule); a data table's own bar stays untouched.
-	 * docs/css.md above. */
+	 * docs/css-fixes.md above. */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))):has(.cbi-progressbar) { display: block; }
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .tr:has(.cbi-progressbar) {
 		display: grid;
@@ -181,7 +181,7 @@
 		margin-block-start: 0;
 	}
 
-	/* narrow card: the value takes its own line, the reserve above cannot fit it — docs/css.md
+	/* narrow card: the value takes its own line, the reserve above cannot fit it — docs/css-fixes.md
 	 * above has the 258px reserve and the 35rem (560px) threshold. */
 	@container fs-view (max-width: 35rem) {
 		:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .tr:has(.cbi-progressbar) .td:first-child {
@@ -197,7 +197,7 @@
 	}
 
 	/* per-row dividers dropped, keyed on table SHAPE (no .th, no 3rd .td — same test as
-	 * 30-tables.css's key/value rule, docs/css.md "Tables: the key/value discriminator") not on the
+	 * 30-tables.css's key/value rule, docs/css-fixes.md "Tables: the key/value discriminator") not on the
 	 * three named cards. attendedsysupgrade's 11_upgrades.js (a stock header row) keeps its
 	 * dividers under this test. */
 	:where(#view)[data-page="admin-status-overview"] .cbi-section .table:not(:has(.th)):not(:has(.td:nth-child(3))) .td,

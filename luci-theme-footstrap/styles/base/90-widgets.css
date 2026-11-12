@@ -12,12 +12,12 @@
 	.cbi-tooltip {
 		position: absolute;
 		z-index: var(--fs-z-tooltip);
-		/* docs/css.md "Widgets: the tooltip parks past the unreachable edge, and the close cross
+		/* docs/css-fixes.md "Widgets: the tooltip parks past the unreachable edge, and the close cross
 		 * needs the same mirror" — a physical `left` grows a 10000px RTL scrollbar. */
 		inset-inline-start: -10000px;
 		border-radius: var(--fs-radius-sm);
 		background: var(--fs-panel);
-		/* pre-wrap, never pre: docs/css.md "Typography and widgets: an opaque token needs
+		/* pre-wrap, never pre: docs/css-fixes.md "Typography and widgets: an opaque token needs
 		 * overflow-wrap: anywhere, a tooltip needs pre-wrap". */
 		white-space: pre-wrap;
 		padding: var(--fs-space-0-5) var(--fs-space-1);
@@ -80,7 +80,7 @@
 
 	/* .btn.large/.btn.small, close cross colour/shadow/opacities: theme/55-buttons.css and
 	 * theme/70-modal.css — absorbed. Left here: geometry only. */
-	/* Physical, hand-mirrored: docs/css.md "Widgets: the tooltip parks past the unreachable edge,
+	/* Physical, hand-mirrored: docs/css-fixes.md "Widgets: the tooltip parks past the unreachable edge,
 	 * and the close cross needs the same mirror" — appears in every modal and .alert-message. */
 	.close {
 		float: right;

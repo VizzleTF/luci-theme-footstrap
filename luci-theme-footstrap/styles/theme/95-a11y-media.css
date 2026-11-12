@@ -14,7 +14,7 @@
 		.cbi-dropdown[open] > ul.dropdown { transition-duration: .01ms !important; }
 	}
 
-	/* re-states the tokens so every rule reading them follows — docs/css.md "A11y: prefers-contrast token shifts, and the numbers behind them" has why each number */
+	/* re-states the tokens so every rule reading them follows — docs/css-fixes.md "A11y: prefers-contrast token shifts, and the numbers behind them" has why each number */
 	@media (prefers-contrast: more) {
 		:root {
 			--fs-border: color-mix(in srgb, var(--fs-text) 45%, var(--fs-bg));
@@ -32,7 +32,7 @@
 
 	/* forced-colors: background-color is forced to the system canvas, so state carried by
 	 * BACKGROUND alone vanishes (active tab, checked toggle, open-list selected row) — re-stated with a
-	 * border/outline in system keywords, which forced-colors keeps — docs/css.md "A11y:
+	 * border/outline in system keywords, which forced-colors keeps — docs/css-fixes.md "A11y:
 	 * forced-colors state repairs". */
 	@media (forced-colors: active) {
 		.tabs > li.active > a,
@@ -62,7 +62,7 @@
 		/* a glyph drawn as a background fill cut out by mask is Canvas on Canvas here: the poll glyph keeps 0 of the
 		 * 103 ink pixels its box shows at rest, and a checked checkbox or radio is pixel-identical to an unchecked
 		 * one. A system colour with the fill un-forced brings it back; ButtonText polling and GrayText paused
-		 * keep the green/grey state — docs/css.md "A11y: forced-colors state repairs". Selectors repeat the
+		 * keep the green/grey state — docs/css-fixes.md "A11y: forced-colors state repairs". Selectors repeat the
 		 * glyph rules' own (20-shell, 60-inputs, base/95-luci) with one class or attribute doubled, one step above the original; the two rail selectors already sit at (1,7,0) and still win by file order. */
 		.fs-sidebar.fs-sidebar.fs-ind-compact #indicators [data-indicator="poll-status"]::before,
 		:root[data-sb][data-rail] .fs-sidebar #indicators [data-indicator="poll-status"],

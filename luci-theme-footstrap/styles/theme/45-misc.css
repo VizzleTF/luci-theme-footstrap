@@ -1,5 +1,5 @@
 @layer theme {
-	/* realtime graphs size their canvas from #view, clipping 34px off the newest samples — docs/css.md "Misc: the realtime graph bleed" */
+	/* realtime graphs size their canvas from #view, clipping 34px off the newest samples — docs/css-fixes.md "Misc: the realtime graph bleed" */
 	#view .cbi-section > div[style]:has(> svg) {
 		width: auto !important;
 		margin-inline: calc(-1 * (var(--fs-card-pad) + 1px));

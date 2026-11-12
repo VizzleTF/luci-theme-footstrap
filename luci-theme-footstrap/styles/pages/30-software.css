@@ -1,6 +1,6 @@
 @layer page {
 	/* Package list and disk-space bar. :where(#view): docs/css.md ":where(#view), not bare
-	 * #view". Full rationale for every rule below: docs/css.md "Software: the disk-space bar and
+	 * #view". Full rationale for every rule below: docs/css-fixes.md "Software: the disk-space bar and
 	 * the carded package row". */
 	:where(#view)[data-page="admin-system-package-manager"] .controls > div:first-child { position: relative; display: block; flex: 1 1 100%; width: 100%; margin: 0 0 var(--fs-space-1-5); }
 

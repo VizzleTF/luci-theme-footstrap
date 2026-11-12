@@ -22,7 +22,7 @@
 		text-align: start;
 	}
 
-	/* Containment default, not the data-table floor: docs/css.md "Tables: overflow-wrap follows
+	/* Containment default, not the data-table floor: docs/css-fixes.md "Tables: overflow-wrap follows
 	 * the tier, not the file". First column is a label too; exempt once carded (.fs-stacked .td,
 	 * theme/30-tables.css). */
 	.table .td { overflow-wrap: anywhere; }
@@ -34,7 +34,7 @@
 		vertical-align: top;
 	}
 
-	/* Out-of-flow, static position (never `bottom: 0`): docs/css.md "Tables: the empty-table
+	/* Out-of-flow, static position (never `bottom: 0`): docs/css-fixes.md "Tables: the empty-table
 	 * placeholder must not pin to the table's bottom" (issue #36). */
 	.tr.placeholder {
 		height: calc(3em + var(--fs-space-4));

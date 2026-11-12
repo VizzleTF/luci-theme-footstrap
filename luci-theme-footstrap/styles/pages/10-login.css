@@ -3,10 +3,10 @@
 	 * `.fs-login`, a class the template puts on the form: replaced
 	 * `form:has(> .cbi-map input[name="luci_username"])`, 49 chars × 17 rules (~0.8 KB) matching
 	 * nothing else. Never turn this into a JS-revealed modal: the view runs pre-session, RPCs answer
-	 * "Access denied", render() never runs. docs/css.md "Login: a definite width, not max-width". */
+	 * "Access denied", render() never runs. docs/css-fixes.md "Login: a definite width, not max-width". */
 	.fs-login {
 		/* DEFINITE width, never max-width: a direct flex item of <body> collapses to min-content
-		 * (~131px) under max-width alone — docs/css.md above. */
+		 * (~131px) under max-width alone — docs/css-fixes.md above. */
 		width: min(400px, calc(100% - 32px));
 		margin: 7vh auto var(--fs-space-10);
 		background: var(--fs-panel); border: var(--fs-hairline); border-radius: var(--fs-radius-lg);
@@ -14,7 +14,7 @@
 		padding: var(--fs-space-6); box-shadow: var(--fs-shadow-pop);
 	}
 	/* router hostname as the card title, at the 20px page-title step; not the eyebrow tokens: those
-	 * force uppercase and a hostname is a name (case tells two similar ones apart). docs/css.md above. */
+	 * force uppercase and a hostname is a name (case tells two similar ones apart). docs/css-fixes.md above. */
 	.fs-login-host {
 		margin: 0 0 var(--fs-space-6); text-align: center;
 		font-size: var(--fs-type-xl); font-weight: var(--fs-weight-bold); letter-spacing: -.01em;

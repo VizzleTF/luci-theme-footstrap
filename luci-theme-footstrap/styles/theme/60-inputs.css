@@ -75,7 +75,7 @@
 	 * The toggle switch is unaffected: its own margin:0 wins on a different ancestor */
 	.btn > input[type="checkbox"], .btn > input[type="radio"] { margin-inline-end: .5em; }
 
-	/* checkbox -> toggle switch, drawn on the INPUT — docs/css.md "Inputs: the toggle switch,
+	/* checkbox -> toggle switch, drawn on the INPUT — docs/css-fixes.md "Inputs: the toggle switch,
 	 * drawn on the input" has the forum regression this replaced. density-scaled local tokens. */
 	/* overflow-wrap: anywhere for the one caption word too long even at full width (pseudo-loc: a
 	 * 14-letter Russian compound grown to 20 pushed the row 24.6px past the field at 320px/Large) */
@@ -89,7 +89,7 @@
 		--fs-sw-pad: calc(2px * var(--fs-density-box));
 		--fs-sw-travel: calc(var(--fs-sw-w) - var(--fs-sw-knob) - var(--fs-sw-pad) * 2 - 2px);
 		/* appearance/--fs-bd-color/--fs-fg-color come from the shared input[type=checkbox] rule below;
-		 * flex-shrink: 0 keeps the pill at its width beside a caption (docs/css.md "Inputs: the toggle switch, drawn on the input, not the label") */
+		 * flex-shrink: 0 keeps the pill at its width beside a caption (docs/css-fixes.md "Inputs: the toggle switch, drawn on the input, not the label") */
 		margin: 0; flex-shrink: 0;
 		width: var(--fs-sw-w); height: var(--fs-sw-h); border-radius: var(--fs-radius-pill);
 		background: var(--fs-track); border: var(--fs-hairline);
@@ -478,9 +478,9 @@
 	 * !important (which would invert layer order); it also covers the Enter-key submit legacy Lua
 	 * pages carry (issue #12). The @container table rules and fs-stacked actions outrank it.
 	 * :not([class*=":"]) excludes a Tailwind/UnoCSS class fs-sheets.js re-hosts into this layer —
-	 * docs/css.md "Inputs: `.hidden.hidden`, and the Tailwind/UnoCSS exception". */
+	 * docs/css-fixes.md "Inputs: `.hidden.hidden`, and the Tailwind/UnoCSS exception". */
 	.hidden.hidden:not([class*=":"]) { display: none; }
-	/* the WCAG 2.5.8 target (24px min) split from the 6px track — docs/css.md "Inputs: the range
+	/* the WCAG 2.5.8 target (24px min) split from the 6px track — docs/css-fixes.md "Inputs: the range
 	 * slider's hit target and its line-box" has the two-part fix and its numbers */
 	input[type="range"] {
 		appearance: none;

@@ -33,7 +33,7 @@ graph is in [ci.md](ci.md).
 8. Reproduce a red CI run locally on the same router before naming a cause.
 
 Neither check judges how a page looks. A CSS change is proven by a computed-style diff:
-[css.md, "Proving a CSS change"](css.md#proving-a-css-change).
+[prove-css-change.md](prove-css-change.md).
 
 ## Contents
 

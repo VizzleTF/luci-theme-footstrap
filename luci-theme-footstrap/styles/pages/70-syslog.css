@@ -1,6 +1,6 @@
 @layer page {
 	/* Filter bar, scoped by SHAPE not `data-page` (a 3rd-party LogreadBox has neither). Row gap
-	 * only — LuCI's inline margin stays as horizontal spacing. docs/css.md "Syslog filter bar". */
+	 * only — LuCI's inline margin stays as horizontal spacing. docs/css-fixes.md "Syslog filter bar". */
 	#content_syslog > div:has(> label) {
 		display: flex;
 		flex-wrap: wrap;
@@ -15,7 +15,7 @@
 		max-width: 100%;
 	}
 
-	/* disjoint tiers, not base+override — neither out-specifies the other, docs/css.md above */
+	/* disjoint tiers, not base+override — neither out-specifies the other, docs/css-fixes.md above */
 	@container fs-view (width > 35rem) {
 		#content_syslog > div:has(> label) > input:not([type]) { flex: 1 1 12rem; }
 	}

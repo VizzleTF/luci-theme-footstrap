@@ -28,7 +28,7 @@
 		border-spacing: 0;
 	}
 
-	/* Outranks every layer's `display`, id rules included: docs/css.md "Reset: [hidden] must
+	/* Outranks every layer's `display`, id rules included: docs/css-fixes.md "Reset: [hidden] must
 	 * outrank every layer, not patch one mistake". */
 	[hidden]:not([hidden="until-found"]) { display: none !important; }
 

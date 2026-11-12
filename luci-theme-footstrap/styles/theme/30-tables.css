@@ -77,7 +77,7 @@
 	 * known only by the tag (Status -> Routing) lost to key/value's default. The padding, frame, corner
 	 * and placeholder rules key on `:is(table, div).fs-dt` (0,1,1) as v0.14.14's `table.fs-dt`, plus
 	 * the bare div: `.table.fs-dt .td` (0,3,0) beat an app's `.table td:nth-child(1)` (0,2,1),
-	 * filemanager padding-left 5 -> 12px (docs/css.md). The rules that were `.table.fs-dt` stay so. */
+	 * filemanager padding-left 5 -> 12px (docs/css-fixes.md). The rules that were `.table.fs-dt` stay so. */
 	.cbi-section .table:is([id], .fs-dt) .td,
 	.cbi-section .table:is([id], .fs-dt) .th,
 	:is(table, div).fs-dt .td, :is(table, div).fs-dt .th { padding: var(--fs-space-2-5) var(--fs-space-3); }
@@ -156,7 +156,7 @@
 	/* --- KEY/VALUE: "no id" is not enough — GridSection also renders no-id .cbi-section-table,
 	 * excluded along with .fs-dt and the legend's inline table-layout. Shape, not a class, says
 	 * data table: any .th or a 3rd .td rules a table out — a real key/value row is exactly 2 .td
-	 * and no .th. docs/css.md, "Tables: the key/value discriminator". */
+	 * and no .th. docs/css-fixes.md, "Tables: the key/value discriminator". */
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.th)):not(:has(.td:nth-child(3))):not([style*="table-layout"]) .td:first-child {
 		color: var(--fs-dim); font-weight: var(--fs-weight); width: 40%; white-space: nowrap;
 	}

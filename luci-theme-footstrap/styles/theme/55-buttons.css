@@ -109,7 +109,7 @@
 		gap: var(--fs-space-2);
 		/* WRAP the bar rather than let items shrink into it: a no-wrap row put the whole squeeze on
 		 * the Save & Apply split control's caption (measured up to 119px cut at 320px/Large) instead
-		 * of sharing it — docs/css.md "Buttons: the page-action bar wraps, not shrinks" has the
+		 * of sharing it — docs/css-fixes.md "Buttons: the page-action bar wraps, not shrinks" has the
 		 * before/after numbers. */
 		flex-wrap: wrap;
 	}
@@ -152,7 +152,7 @@
 	.cbi-section-table .cbi-button {
 		min-height: var(--fs-ctl-h-sm); padding: 0 var(--fs-space-3); font-size: var(--fs-type);
 		/* flex-basis: auto, not a definite basis: with one, the automatic minimum resolves to 0 in
-		 * every row and flex-grow divides by count instead of by need — docs/css.md "Buttons:
+		 * every row and flex-grow divides by count instead of by need — docs/css-fixes.md "Buttons:
 		 * `flex-basis: auto`, not the definite basis base gave every row action" has the
 		 * regression this fixed and the measured widths before/after. */
 		flex-basis: auto;

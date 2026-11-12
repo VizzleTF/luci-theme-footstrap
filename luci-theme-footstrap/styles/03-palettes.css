@@ -67,7 +67,7 @@
 		/* ink ON the fills above — white clears AA on all four: 5.19/5.28/5.19/5.36. --fs-panel-base
 		 * and these four inks are the same #fff in every light palette below, so THIS is their
 		 * only definition — hicontrast/bootstrap/2020/forum's light blocks inherit them, unset.
-		 * docs/design-system.md "Adding a palette". */
+		 * docs/add-palette.md "Adding a palette". */
 		--fs-on-accent: #fff;
 		--fs-on-good: #fff;
 		--fs-on-warn: #fff;

@@ -5,6 +5,27 @@ Every page here stands on its own: start wherever your question is.
 
 Installing and using the theme is in the [repository README](../README.md).
 
+## I want to…
+
+| Task | Go to |
+|---|---|
+| fix a CSS bug, start to finish | [development.md, "Fixing a CSS bug: the path"](development.md#fixing-a-css-bug-the-path) |
+| prove a CSS change did only what I meant | [prove-css-change.md](prove-css-change.md) |
+| find why a rule in `styles/` exists | [css-fixes.md](css-fixes.md): a `styles/pages/` file has a row in its first table; for `base/` and `theme/`, search for the file name |
+| find which file styles part of the sidebar or bar | [chrome.md, "Where a rule lives"](chrome.md#where-a-rule-lives) |
+| add a colour palette | [add-palette.md](add-palette.md) |
+| tell whether the theme or an app is at fault | [third-party-apps.md, "Triage: theme or app?"](third-party-apps.md#triage-theme-or-app) |
+| find why a page lost its scroll position | [spa-router.md, "Scroll lost? Check in this order"](spa-router.md#scroll-lost-check-in-this-order) |
+| add a file to the package | [package.md, "Adding a file"](package.md#adding-a-file) |
+| check my patch before review | [conventions.md, "Before review"](conventions.md#before-review) |
+| run e2e and anchor-check on the dev routers | [verifying.md, "Run e2e on both routers"](verifying.md#run-e2e-on-both-routers) |
+| understand a red CI run | [verifying.md, "Reading a run"](verifying.md#reading-a-run), then [ci.md](ci.md) |
+| fix a dev stand that shows no theme, a 403, a 502 or a stale package | [stand-traps.md](stand-traps.md) |
+| cut a release | [releasing.md](releasing.md) |
+| style my own `luci-app-*` for any theme | [luci-app-styling-guide.md](luci-app-styling-guide.md) ([по-русски](luci-app-styling-guide_ru.md)) |
+
+The tables below list every page by area.
+
 ## Start here
 
 | Page | Answers |
@@ -12,6 +33,7 @@ Installing and using the theme is in the [repository README](../README.md).
 | [architecture.md](architecture.md) | What LuCI expects from a theme, and where footstrap plugs into it |
 | [conventions.md](conventions.md) | The rules a patch must follow, and why |
 | [development.md](development.md) | Bring up a dev router, push a change, prove it works |
+| [stand-traps.md](stand-traps.md) | Troubleshooting the dev stand: symptoms that make a measurement lie |
 | [verifying.md](verifying.md) | The router checks (`tools/e2e.mjs`, `tools/anchor-check.mjs`): what they prove, running them, reading their CI artifacts |
 
 ## How it is built
@@ -19,7 +41,10 @@ Installing and using the theme is in the [repository README](../README.md).
 | Page | Answers |
 |---|---|
 | [design-system.md](design-system.md) | Tokens, palettes, typography, scales, the appearance axes |
-| [css.md](css.md) | The `styles/` tree, cascade layers, `build-css.sh`, proving a CSS change |
+| [add-palette.md](add-palette.md) | How to add a colour palette |
+| [css.md](css.md) | The `styles/` tree, cascade layers, `build-css.sh` |
+| [css-fixes.md](css-fixes.md) | Every page, base and theme correction, with its reason; the card contract for tables |
+| [prove-css-change.md](prove-css-change.md) | How to prove a CSS change: computed-style diff over the gallery and on a router |
 | [chrome.md](chrome.md) | Sidebar, icon rail, top bar, the menu renderer, the fit measurement |
 | [spa-router.md](spa-router.md) | Client-side navigation: how it works and what it refuses to do |
 | [third-party-apps.md](third-party-apps.md) | Coexisting with foreign `luci-app-*` |

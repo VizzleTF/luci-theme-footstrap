@@ -1,5 +1,5 @@
 @layer page {
-	/* :where(#view): docs/css.md ":where(#view), not bare #view". Rest: docs/css.md "SSH-keys: the
+	/* :where(#view): docs/css.md ":where(#view), not bare #view". Rest: docs/css-fixes.md "SSH-keys: the
 	 * card wrapper and the wide dynlist". */
 	:where(#view)[data-page="admin-system-admin-sshkeys"] > div {
 		background: var(--fs-panel);

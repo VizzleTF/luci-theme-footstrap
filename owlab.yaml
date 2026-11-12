@@ -201,5 +201,5 @@ routers:
     # ssh 2228, NOT 2222: 2222 is the port a developer machine's own sshd usually listens on, and
     # docker refuses the bind with "address already in use" — which is why this stand had never come
     # up, and why every measurement that claimed the snapshot line was made on two routers instead
-    # of three. docs/development.md, "The stand's own traps".
+    # of three. docs/stand-traps.md, "The stand's own traps".
     ports: { http: 8022, ssh: 2228 }
