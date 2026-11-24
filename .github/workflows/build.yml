@@ -87,7 +87,7 @@ jobs:
           [ "${GITHUB_REF_TYPE}" != tag ] || ver="${GITHUB_REF_NAME#v}"
           sh tools/release-notes.sh "$ver" > /dev/null
       # The `uses:` ref is the pin Dependabot moves; an unset version installs that ref.
-      - uses: owfeed/owfeed/setup@v0.5.6
+      - uses: owfeed/owfeed/setup@v0.5.8
         id: owfeedsetup
       # The SDK owfeed fetches on its first build (~60 s on a bare runner, 2 s with it here); the lock
       # names the release points, so a new point is a new key. So is a new owfeed: it checks the
@@ -159,7 +159,7 @@ jobs:
           echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
         id: owlab
-        uses: owfeed/owlab/setup@v0.7.0
+        uses: owfeed/owlab/setup@v0.8.0
       # The extras and compliance files owlab fetches by URL (pinned releases): a GitHub hiccup on
       # any of them failed the build of the router. owlab fetches only the router it builds, so the
       # key names the router.
@@ -216,7 +216,7 @@ jobs:
           key: ${{ steps.browsers.outputs.cache-primary-key }}
       - if: env.RUN == 'true'
         id: owfeedsetup
-        uses: owfeed/owfeed/setup@v0.5.6
+        uses: owfeed/owfeed/setup@v0.5.8
       - if: env.RUN == 'true'
         id: owfeed
         uses: actions/cache/restore@v6
@@ -319,7 +319,7 @@ jobs:
           echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
         id: owlab
-        uses: owfeed/owlab/setup@v0.7.0
+        uses: owfeed/owlab/setup@v0.8.0
       - if: env.RUN == 'true'
         id: owlabfetch
         uses: actions/cache/restore@v6
@@ -387,7 +387,7 @@ jobs:
           key: ${{ steps.debs.outputs.cache-primary-key }}
       - if: env.RUN == 'true'
         id: owfeedsetup
-        uses: owfeed/owfeed/setup@v0.5.6
+        uses: owfeed/owfeed/setup@v0.5.8
       - if: env.RUN == 'true'
         id: owfeed
         uses: actions/cache/restore@v6
@@ -488,7 +488,7 @@ jobs:
           echo "RUN=$run" | tee -a "$GITHUB_ENV"
       - if: env.RUN == 'true'
         id: owlab
-        uses: owfeed/owlab/setup@v0.7.0
+        uses: owfeed/owlab/setup@v0.8.0
       - if: env.RUN == 'true'
         id: owlabfetch
         uses: actions/cache/restore@v6
@@ -612,7 +612,7 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.6
+    uses: owfeed/owfeed/.github/workflows/package.yml@v0.5.8
     secrets:
       sign-key: ${{ secrets.OWFEED_AUTHOR_KEY }}
       usign-key: ${{ secrets.FOOTSTRAP_USIGN_KEY }}

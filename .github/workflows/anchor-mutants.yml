@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - id: owlab
-        uses: owfeed/owlab/setup@v0.7.0
+        uses: owfeed/owlab/setup@v0.8.0
       # The extras and compliance files owlab fetches by URL (pinned releases).
       - id: owlabfetch
         uses: actions/cache/restore@v6
@@ -111,7 +111,7 @@ jobs:
           path: ~/.cache/playwright-debs
           key: ${{ steps.debs.outputs.cache-primary-key }}
       - id: owfeedsetup
-        uses: owfeed/owfeed/setup@v0.5.6
+        uses: owfeed/owfeed/setup@v0.5.8
       - id: owfeed
         uses: actions/cache/restore@v6
         with:
