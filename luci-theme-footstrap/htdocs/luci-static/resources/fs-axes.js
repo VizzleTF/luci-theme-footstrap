@@ -236,6 +236,9 @@ function glassAxis(key, sdKey, prop, attr) {
 const CARD_OP = glassAxis('fs-card-opacity', 'card_opacity', '--fs-card-opacity', 'data-glass');
 const BAR_OP = glassAxis('fs-bar-opacity', 'bar_opacity', '--fs-bar-opacity', 'data-glass-bar');
 /* how the glass is made: Flat (own colours, no blur), Frosted (a veil of ink, blurred) or Acrylic */
+/* Submenus On hover / On click: 'click' keeps the bar dropdowns and rail flyouts shut until clicked, as a tap does
+ * (20-shell.css drops their :hover rules, fs-chrome.js stops a pointer closing them); 'hover' = bare :root */
+const SUBMENU_OPEN = enumAxis('fs-submenu-open', 'data-submenu-open', 'click', 'hover');
 const MATERIALS = [ 'flat', 'acrylic' ];	/* the non-default values; 'frosted' = bare :root */
 const MATERIAL = listAxis('fs-material', 'data-material', MATERIALS, 'frosted');
 /* Frosted's and Acrylic's blur as a share of the material's own radius, 100 = as designed */
@@ -268,6 +271,7 @@ const AXES = {
 		current: () => (prefs.currentAutoCollapse() ? 'on' : 'off'),
 		def: () => (prefs.autoCollapseDefault() ? 'on' : 'off'),
 		apply: prefs.applyAutoCollapse }, builtin: 'off' },
+	submenu_open: { key: 'fs-submenu-open', ax: SUBMENU_OPEN, builtin: 'hover' },
 	tint_strength: { key: 'fs-tint-strength', ax: TSTR, builtin: FS_TSTR_DEFAULT },
 	density: { key: 'fs-density', ax: DENSITY, builtin: 'normal' },
 	photo_dim: { key: 'fs-photo-dim', ax: PDIM, builtin: FS_PDIM_DEFAULT },
@@ -367,6 +371,7 @@ return baseclass.extend({
 	barOpacity: BAR_OP,
 	material: MATERIAL,
 	blur: BLUR,
+	submenuOpen: SUBMENU_OPEN,
 	pattern: PATTERN,
 	loginBg: LOGIN_BG,
 

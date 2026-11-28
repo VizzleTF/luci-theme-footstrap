@@ -476,9 +476,11 @@ function renderMainMenu(node, url, level, parentActive = true) {
 			wireActivate(link, () => link.click());
 
 			/* hybrid devices: once a real mouse enters, drop the tap-opened panel so hover is authoritative;
-			 * guarded on pointerType, since a touch tap fires pointerenter ('touch') first */
+			 * guarded on pointerType, since a touch tap fires pointerenter ('touch') first. Under Open
+			 * submenus -> On click hover opens nothing, so a pointer passing over must not close a panel. */
 			li.addEventListener('pointerenter', (ev) => {
-				if (ev.pointerType === 'mouse' && flyoutMode())
+				if (ev.pointerType === 'mouse' && flyoutMode() &&
+				    !document.documentElement.hasAttribute('data-submenu-open'))
 					closeFlyouts();
 				clampDropdown(li);
 			});

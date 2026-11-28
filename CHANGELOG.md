@@ -1,3 +1,13 @@
+## [Unreleased]
+
+### Added
+
+- **System → Footstrap → Interface gains a Submenus row with On hover and On click ([#93](https://github.com/VizzleTF/luci-theme-footstrap/issues/93)).** On hover is the default and behaves as before. On click keeps the top bar's dropdowns and the collapsed rail's flyouts shut until you click a section, as a tap on a phone does; a click on the section again, a click elsewhere or Escape closes it, and moving the pointer over the other sections no longer opens or closes anything. Saved per browser, and for the whole router when saved as the default.
+
+### Fixed
+
+- **The expanded sidebar unfolds a section on a click again, not when the pointer passes over it.** Since 0.14.19, pointing at Status or System unfolded the section, and moving past it folded it back, so the entries below jumped up and the pointer landed on a different section (forum.openwrt.org/t/251930 post #176). The 0.14.19 build shortened the accordion's hiding rule to a lower specificity than the top bar's hover rule, (0,4,2) against (0,4,3), so the bar's hover won inside the sidebar too. The hover rule now applies only where the menu is a bar; measured in Chromium, a hovered closed section stays `display: none`.
+
 ## [0.14.21] — 2026-11-13
 
 ### Fixed

@@ -116,9 +116,11 @@
 		content: ""; position: absolute; inset-inline: 0; top: -10px; height: 10px;
 	}
 	/* hover only on a real pointer: a tap leaves :hover stuck on mobile browsers, which
-	 * would block tap-to-close */
+	 * would block tap-to-close. Not under [data-sb]: it out-ranks the accordion's (0,4,2)
+	 * display:none below and unfolds a section under the pointer. Not under Submenus ->
+	 * On click (data-submenu-open): there only .open shows a panel. */
 	@media (hover: hover) {
-		.fs-sidebar ul.nav > li.has-sub:hover > ul { display: block; }
+		:root:not([data-sb]):not([data-submenu-open]) .fs-sidebar ul.nav > li.has-sub:hover > ul { display: block; }
 	}
 	.fs-sidebar ul.nav > li.has-sub.open > ul { display: block; }
 	/* a submenu link is the same link in every layout, the accordion included. */
@@ -381,7 +383,7 @@
 		}
 		:root[data-sb][data-rail] .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
 		@media (hover: hover) {
-			:root[data-sb][data-rail] .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
+			:root[data-sb][data-rail]:not([data-submenu-open]) .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
 		}
 		/* The flyout's heading reuses the bar's hover-bridge pseudo-element (issue #22) —
 		 * chrome.md, "A flyout's heading reuses the bar's hover-bridge pseudo-element". */

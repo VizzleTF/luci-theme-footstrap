@@ -480,7 +480,7 @@ The page groups them in four tabs, LuCI's own `ui.tabs`, with the Saving card un
 | Tab | Axes |
 |---|---|
 | Colour scheme | Mode, Palette, Accent |
-| Interface | Layout, Submenus, Density, Text size, Content width, Rounding |
+| Interface | Layout, Submenus (keep open / auto-collapse), Submenus (hover / click), Density, Text size, Content width, Rounding |
 | Background | Tint and its strength, Wallpaper, Pattern and its three axes, File and Dim, then Transparency (Card opacity, Menu opacity, Material, Blur), shown only under a wallpaper |
 | Colours | Good, Warning, Danger and the four surface axes |
 
@@ -512,6 +512,7 @@ One row per axis. The sections after the table explain the axes that need more t
 | Content width | 1280–3840px, default 1280 | `fs-content-width` | `--fs-content-max` |
 | Text size | 80–150%, default 100 | `fs-text-size` | `--fs-text-size` (`<html>`'s font-size) |
 | Submenus | keep open / auto-collapse | `fs-menu-autocollapse` | none |
+| Submenus (hover / click) | hover (default) / click; the bar's dropdowns and the rail's flyouts | `fs-submenu-open` | `data-submenu-open=click` |
 
 ### Content width
 

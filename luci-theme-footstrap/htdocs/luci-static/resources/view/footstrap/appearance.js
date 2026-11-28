@@ -345,6 +345,13 @@ function build() {
 			[ 'on',  _('Auto-collapse', 'footstrap') ]
 		], bump(prefs.applyAutoCollapse), label), { cls: 'fs-ap-submenus' }),
 
+		/* the bar's dropdowns and the rail's flyouts; the expanded sidebar's accordion opens on a
+		 * click in either mode, so this row stays in every layout */
+		group(_('Submenus', 'footstrap'), (label) => segCtl(axes.submenuOpen.current(), [
+			[ 'hover', _('On hover', 'footstrap') ],
+			[ 'click', _('On click', 'footstrap') ]
+		], bump(axes.submenuOpen.apply), label)),
+
 		group(_('Density', 'footstrap'), (label) => segCtl(axes.density.current(), [
 			[ 'compact', _('Compact', 'footstrap') ],
 			[ 'normal',  _('Normal', 'footstrap') ],

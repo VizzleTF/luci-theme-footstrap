@@ -17,7 +17,7 @@
 	for (let k, l in {
 		layout: [ 'sidebar', 'top' ], darkmode: [ 'auto', 'light', 'dark' ],
 		palette: [ 'footstrap', 'hicontrast', 'bootstrap', '2020', 'forum' ], wallpaper: [ 'off', 'pattern', 'file' ],
-		pattern_ink: [ 'theme', 'original' ], autocollapse: [ 'on', 'off' ],
+		pattern_ink: [ 'theme', 'original' ], autocollapse: [ 'on', 'off' ], submenu_open: [ 'hover', 'click' ],
 		density: [ 'compact', 'normal', 'large' ], material: [ 'flat', 'frosted', 'acrylic' ]
 	})
 		if (index(l, fs_defaults[k]) >= 0)
@@ -193,6 +193,8 @@
 					/* Density: a pure token axis (02-tokens multiplies the type and space ladders).
 					   Normal is a bare :root. */
 					list('density', [ 'compact', 'large' ]);
+					/* Submenus On hover / On click: On click drops the menu's :hover rules. Hover is a bare :root. */
+					list('submenu-open', [ 'click' ]);
 					/* Content width: how far the column may grow past the 1280px default, as a px length
 					   (the slider is continuous). */
 					num('content-width', 1280, 3840, 1280, '--fs-content-max', 'px');

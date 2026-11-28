@@ -515,7 +515,12 @@ exception.
 
 ### Smaller rules
 
-- Hover opening is pure CSS.
+- Hover opening is pure CSS, and only where a panel is a popup: the bar (`:root:not([data-sb])`) and
+  the rail. The accordion's `display: none` is (0,4,2), so an unscoped bar hover rule at (0,4,3)
+  unfolded a section under the pointer (0.14.19 to 0.14.21).
+- Submenus → On click stamps `data-submenu-open="click"`. Both hover rules are guarded off by
+  it, so a panel shows only through `.open`, which the click handler already toggles for a tap. The
+  `pointerenter` handler stops closing the open panel then, since hover no longer replaces it.
 - The width probe declares its properties `!important`. An app carrying
   `div { min-width: 500px !important }` would otherwise win every read and fold the sidebar into a
   bar on a wide desktop.
